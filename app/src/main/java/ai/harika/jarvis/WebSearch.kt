@@ -77,7 +77,7 @@ object WebSearch {
                 val title = cleanHtml(match.groupValues[1])
                 val parsedUri = runCatching { URI(destination) }.getOrNull()
                 val scheme = parsedUri?.scheme?.lowercase()
-                if (scheme !in setOf("http", "https") || parsedUri.host.isNullOrBlank()) continue
+                if (scheme !in setOf("http", "https") || parsedUri?.host.isNullOrBlank()) continue
                 if (title.isBlank() || results.any { it.url == destination }) continue
 
                 val end = links.getOrNull(index + 1)?.range?.first ?: html.length
