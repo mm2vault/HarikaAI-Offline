@@ -45,6 +45,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val releasesPage = "https://github.com/mm2vault/HarikaAI-Offline/releases"
     private val channelId = "aura_notifications"
     private lateinit var messages: LinearLayout
+    private lateinit var welcomeArea: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var prompt: EditText
     private lateinit var status: TextView
@@ -84,6 +85,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         header.addView(button("Ayarlar", false) { settings() })
         root.addView(header)
 
+        welcomeArea = LinearLayout(this).apply { orientation = 1 }
         val hero = LinearLayout(this).apply {
             orientation = 1; gravity = Gravity.CENTER; setPadding(dp(16), dp(17), dp(16), dp(17))
             background = gradient(intArrayOf(Color.rgb(44, 28, 76), Color.rgb(19, 16, 32)), 26)
@@ -96,7 +98,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         status = label("Model henüz yüklenmedi", 12f, Color.rgb(255, 204, 123), true)
         (status.layoutParams as? LinearLayout.LayoutParams)?.gravity = Gravity.CENTER
         hero.addView(status)
-        root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        welcomeArea.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
         val updatePanel = LinearLayout(this).apply {
             orientation = 1; setPadding(dp(12), dp(10), dp(12), dp(10))
@@ -107,7 +109,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         updateRow.addView(button("Kontrol et", true) { checkUpdates(false) })
         updatePanel.addView(updateRow)
         updatePanel.addView(label("Sürüm denetimi ve güvenli APK kurulumu", 12f, Color.LTGRAY, false))
-        root.addView(updatePanel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        welcomeArea.addView(updatePanel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
         // Quick actions are lightweight native views; no extra library is needed.
         val quickScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
@@ -130,7 +132,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             quickRow.addView(chip, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(8) })
         }
         quickScroll.addView(quickRow)
-        root.addView(quickScroll, LinearLayout.LayoutParams(-1, -2))
+        welcomeArea.addView(quickScroll, LinearLayout.LayoutParams(-1, -2))
+        root.addView(welcomeArea, LinearLayout.LayoutParams(-1, -2))
 
         scroll = ScrollView(this).apply { isFillViewport = true }
         messages = LinearLayout(this).apply { orientation = 1 }
@@ -197,6 +200,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (history.isEmpty()) {
             bubble("AURA AI", "Selam! Ben Aura AI. Modeli indirdiğinde cihazında yerel olarak sohbet edebiliriz.", false, false)
         } else {
+            welcomeArea.visibility = View.GONE
             history.forEach { entry ->
                 bubble(entry.who, entry.text, entry.who == "Sen", false)
             }
@@ -233,6 +237,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val q = prompt.text.toString().trim()
         if (q.isEmpty() || busy) return
         prompt.setText("")
+        welcomeArea.visibility = View.GONE
         bubble("Sen", q, true, true)
         val webQuery = extractWebQuery(q)
         if (webQuery != null) {
