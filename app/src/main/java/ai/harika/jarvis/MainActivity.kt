@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.text.util.Linkify
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
@@ -147,7 +148,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
         }
         card.addView(label(who.uppercase(Locale.ROOT), 10f, if (user) cyan else purple, true))
-        card.addView(label(text, 15f, Color.rgb(244, 241, 250), false).apply { setPadding(0, dp(4), 0, 0) })
+        card.addView(label(text, 15f, Color.rgb(244, 241, 250), false).apply {
+            setPadding(0, dp(4), 0, 0)
+            autoLinkMask = Linkify.WEB_URLS
+            linksClickable = true
+            setLinkTextColor(cyan)
+        })
         messages.addView(card)
         if (save) {
             val old = prefs.getString("history", "").orEmpty()
@@ -162,6 +168,35 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (q.isEmpty() || busy) return
         prompt.setText("")
         bubble("Sen", q, true, true)
+        val webQuery = extractWebQuery(q)
+        if (webQuery != null) {
+            busy = true
+            status.text = "●  İnternette aranıyor…"
+            thread {
+                try {
+                    val results = WebSearch.search(webQuery)
+                    val answer = if (results.isEmpty()) {
+                        "Bu sorgu için sonuç bulunamadı. Daha farklı kelimelerle tekrar dene."
+                    } else {
+                        results.mapIndexed { index, item ->
+                            "${index + 1}. ${item.title}\n${item.snippet}\n${item.url}"
+                        }.joinToString("\n\n")
+                    }
+                    runOnUiThread {
+                        bubble("JARVİS · WEB ARAMA", answer, false, true)
+                        status.text = if (results.isEmpty()) "●  Arama tamamlandı · sonuç yok" else "●  İnternet araması tamamlandı"
+                        busy = false
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        bubble("WEB ARAMA", "İnternette arama yapılamadı. Bağlantını kontrol edip tekrar dene.\nAyrıntı: ${e.message ?: "bağlantı hatası"}", false, true)
+                        status.text = "●  İnternet araması kullanılamıyor"
+                        busy = false
+                    }
+                }
+            }
+            return
+        }
         val conv = conversation
         if (conv == null) {
             busy = true
@@ -190,6 +225,24 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 runOnUiThread { bubble("SİSTEM", "Yanıt hatası: " + (e.message ?: "bilinmeyen hata"), false, true); busy = false }
             }
         }
+    }
+
+    /**
+     * Explicit online-search commands only; normal chat stays local/offline.
+     * Examples: "webde ara: Türkiye AI haberleri" or "Türkiye AI haberleri webde ara".
+     */
+    private fun extractWebQuery(message: String): String? {
+        val clean = message.trim()
+        val patterns = listOf(
+            Regex("(?i)^(?:webde ara|internette ara|internette araştır|web search)\\s*:?\\s*(.+)$"),
+            Regex("(?i)^(.+?)\\s+(?:webde ara|internette ara)$")
+        )
+        for (pattern in patterns) {
+            val match = pattern.matchEntire(clean) ?: continue
+            val query = if (pattern.pattern.startsWith("(?i)^(")) match.groupValues[1] else match.groupValues[1]
+            if (query.isNotBlank()) return query.trim()
+        }
+        return null
     }
 
     private fun lightweightReply(input: String): String {
