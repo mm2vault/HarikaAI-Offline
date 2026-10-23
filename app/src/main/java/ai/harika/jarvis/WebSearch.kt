@@ -26,9 +26,9 @@ object WebSearch {
         require(cleanQuery.isNotEmpty()) { "Arama sorgusu boş olamaz." }
         require(limit in 1..10) { "Sonuç sayısı 1-10 arasında olmalı." }
 
-        val encoded = URLEncoder.encode(cleanQuery, "UTF-8")
-        val connection = URL("https://html.duckduckgo.com/html/?q=$encoded")
-            .openConnection() as HttpURLConnection
+        val connection = URL(
+            "https://html.duckduckgo.com/html/?q=" + URLEncoder.encode(cleanQuery, "UTF-8")
+        ).openConnection() as HttpURLConnection
         connection.connectTimeout = 8000
         connection.readTimeout = 10000
         connection.instanceFollowRedirects = true
@@ -56,26 +56,34 @@ object WebSearch {
                 output.toString(Charsets.UTF_8.name())
             }
 
-            val linkRegex = Regex(
-                """(?is)<a\b[^>]*class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>"""
+            // The class and href attributes may appear in either order.
+            val anchorRegex = Regex(
+                """(?is)<a\\b(?=[^>]*\\bclass\\s*=\\s*["'][^"']*\\bresult__a\\b[^"']*["'])[^>]*>(.*?)</a>"""
             )
+            val hrefRegex = Regex("""(?is)\\bhref\\s*=\\s*["']([^"']+)["']""")
             val snippetRegex = Regex(
-                """(?is)class=["'][^"']*result__snippet[^"']*["'][^>]*>(.*?)</(?:a|div|span)>"""
+                """(?is)class\\s*=\\s*["'][^"']*\\bresult__snippet\\b[^"']*["'][^>]*>(.*?)</(?:a|div|span)>"""
             )
-            val links = linkRegex.findAll(html).toList()
+            val links = anchorRegex.findAll(html).toList()
             val results = mutableListOf<WebSearchResult>()
 
             for ((index, match) in links.withIndex()) {
-                val rawUrl = decodeHtml(match.groupValues[1]).trim()
+                val openingTag = match.value.substringBefore(">")
+                val rawUrl = hrefRegex.find(openingTag)?.groupValues?.get(1)
+                    ?.let(::decodeHtml)?.trim().orEmpty()
+                if (rawUrl.isBlank()) continue
+
                 val destination = unwrapUrl(rawUrl)
-                val title = cleanHtml(match.groupValues[2])
-                if (!destination.startsWith("https://") && !destination.startsWith("http://")) continue
+                val title = cleanHtml(match.groupValues[1])
+                val parsedUri = runCatching { URI(destination) }.getOrNull()
+                val scheme = parsedUri?.scheme?.lowercase()
+                if (scheme !in setOf("http", "https") || parsedUri.host.isNullOrBlank()) continue
                 if (title.isBlank() || results.any { it.url == destination }) continue
 
-                // Keep snippet parsing within this result, so it cannot borrow another result's text.
                 val end = links.getOrNull(index + 1)?.range?.first ?: html.length
                 val resultBlock = html.substring(match.range.first, end)
-                val snippet = snippetRegex.find(resultBlock)?.groupValues?.get(1)?.let(::cleanHtml).orEmpty()
+                val snippet = snippetRegex.find(resultBlock)?.groupValues?.get(1)
+                    ?.let(::cleanHtml).orEmpty()
                 results.add(WebSearchResult(title, destination, snippet))
                 if (results.size >= limit) break
             }
@@ -86,7 +94,7 @@ object WebSearch {
     }
 
     private fun cleanHtml(value: String): String =
-        Html.fromHtml(value.replace(Regex("(?is)<[^>]+>"), ""), Html.FROM_HTML_MODE_LEGACY)
+        Html.fromHtml(value, Html.FROM_HTML_MODE_LEGACY)
             .toString().replace(Regex("\\s+"), " ").trim()
 
     private fun decodeHtml(value: String): String =
@@ -95,7 +103,8 @@ object WebSearch {
     private fun unwrapUrl(raw: String): String {
         val normalized = if (raw.startsWith("//")) "https:$raw" else raw
         val uri = runCatching { URI(normalized) }.getOrNull() ?: return normalized
-        if (!uri.host.orEmpty().contains("duckduckgo.com")) return normalized
+        val host = uri.host.orEmpty().lowercase()
+        if (host != "duckduckgo.com" && !host.endsWith(".duckduckgo.com")) return normalized
 
         val target = uri.rawQuery.orEmpty().split("&")
             .firstOrNull { it.startsWith("uddg=") }
