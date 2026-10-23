@@ -1,23 +1,34 @@
-# JARVIS Brain
+# Aura AI — Brain / Runtime
 
-This directory documents the AI runtime boundary for JARVIS AI.
+## Hedefler
+- Offline-first: Qwen LiteRT-LM modeli kullanıcının cihazında çalışır.
+- Varsayılan akışta ücretli API anahtarı yoktur.
+- Model yoksa veya bozuksa uygulama bunu açıkça söyler; basit yedek yanıtlar gerçek AI gibi sunulmaz.
+- Arayüz, model motoru, sohbet hafızası, indirme, ses ve güncelleme kodu birbirinden ayrılır.
+- İsteğe bağlı çevrimiçi araçlar çevrimdışı sohbeti engellemez.
 
-## Design goals
-- Offline-first: the Android app runs the Qwen LiteRT-LM model on the user's device.
-- No paid API key is required for local inference.
-- A missing or broken model must be reported clearly; the lightweight fallback is not presented as a full AI.
-- Keep UI code separate from inference, prompt policy, local memory, and tools.
-- Any future remote brain must be optional, separately deployable, and never require paid services by default.
+## Mevcut durum
+Eski iskelette model motoru ve birçok uygulama sorumluluğu tek MainActivity.kt içinde. Model LiteRT-LM Engine ve Conversation üzerinden açılıyor. Bu henüz modüllere ayrılmış ve test edilmiş mimari değildir.
 
-## Current runtime
-The current Android inference path is implemented in `app/src/main/java/ai/harika/jarvis/MainActivity.kt` using LiteRT-LM. The app downloads the model file and initializes an `Engine` and `Conversation`.
+## Hedef modüller
+1. ui: ekran, mesaj balonları, durum ve etkileşim.
+2. brain: model motoru, prompt ve üretim yaşam döngüsü.
+3. data: sürümlenmiş sohbet geçmişi ve dışa/içe aktarma.
+4. model: güvenli indirme, geçici dosya, doğrulama, tekrar deneme ve iptal.
+5. voice: Android konuşma tanıma ve TTS.
+6. updater: release metadata, sürüm karşılaştırma ve APK indirme.
+7. tools: tarih/saat, hesap makinesi ve açıkça çağrılan web araması.
 
-## Next implementation milestones
-1. Move model initialization and generation out of MainActivity into a dedicated Kotlin brain class.
-2. Add verified model download (expected size, checksum if upstream provides one, temporary file, resume/retry).
-3. Add structured conversation memory and safe tool dispatch (date/time, arithmetic, local app actions).
-4. Add clear model health diagnostics and recoverable initialization errors.
-5. Test on a real Android device with the actual model; a successful APK build alone does not prove inference works.
+## Veri koruma
+- applicationId uyumluluk doğrulanmadan değiştirilmemeli.
+- Android güncellemesi aynı paket kimliği ve aynı imza sertifikasını gerektirir.
+- Yeni debug anahtarı mevcut kuruluma uyacak varsayımı yapılmamalı.
+- Sohbet dışa aktarma eklenmeden depolama şeması yıkıcı biçimde değiştirilmemeli.
+- Tamamlanmamış model dosyası geçerli kabul edilmemeli.
+- Sürüm etiketi tek başına sürüm karşılaştırması için yeterli değildir; sayısal versionCode tercih edilir.
 
-## Important limitation
-Without a loaded language model or a remote inference service, ordinary code cannot provide open-ended, general-purpose AI answers. The no-model mode is only a small rule-based fallback.
+## Doğrulama
+- assembleDebug ve imza yapılandırıldıysa assembleRelease.
+- Paket/manifest/ikon referansları, iş akışı YAML'si ve eski marka metinleri kontrolü.
+- Cihazda temiz kurulum, güncelleme, geçmişin korunması, kesintili indirme, model açılışı, ses izinleri ve APK kurulum akışı testi.
+- Bu kontroller yapılana kadar her cihazda çalıştığı iddia edilmez.
