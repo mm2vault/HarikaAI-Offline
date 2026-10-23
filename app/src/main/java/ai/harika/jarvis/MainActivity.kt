@@ -46,6 +46,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var engine: Engine? = null
     private var conversation: Conversation? = null
     private var busy = false
+    private var ttsReady = false
     private val prefs by lazy { getSharedPreferences("jarvis", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +59,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 74)
         buildUi()
         restoreChat()
+        val savedModel = File(filesDir, modelName)
+        if (savedModel.exists() && savedModel.length() > 100_000_000L) {
+            status.text = "●  Kayıtlı model bulundu; başlatılıyor…"
+            initializeModel(savedModel)
+        }
         checkUpdates(true)
     }
 
@@ -85,6 +91,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }, LinearLayout.LayoutParams(dp(78), dp(78)).apply { bottomMargin = dp(12) })
         hero.addView(label("Nasıl yardımcı olabilirim?", 20f, Color.WHITE, true))
         hero.addView(label("Sor, düşün, üret. Sohbetlerin cihazında kalır.", 12f, Color.rgb(194, 184, 215), false))
+        hero.addView(label("MODEL YOKSA HAFİF MOD · MODELLE TAM SOHBET", 9f, Color.rgb(190, 154, 255), true))
         status = label("●  Model henüz yüklenmedi", 12f, Color.rgb(255, 204, 123), true)
         (status.layoutParams as? LinearLayout.LayoutParams)?.gravity = Gravity.CENTER
         hero.addView(status)
@@ -106,7 +113,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         scroll.addView(messages)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        root.addView(button("⬇  Ücretsiz yerel modeli indir  ·  ~586 MB", true) { downloadModel() },
+        root.addView(button("⬇  Ücretsiz AI modelini indir / başlat  ·  ~586 MB", true) { downloadModel() },
             LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8); bottomMargin = dp(8) })
         val composer = LinearLayout(this).apply { orientation = 0; gravity = Gravity.CENTER_VERTICAL }
         prompt = EditText(this).apply {
@@ -156,7 +163,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         prompt.setText("")
         bubble("Sen", q, true, true)
         val conv = conversation
-        if (conv == null) { bubble("JARVİS", "Önce yerel modeli indirip başlat.", false, true); return }
+        if (conv == null) {
+            busy = true
+            status.text = "●  Hafif çevrimdışı mod · model yok"
+            thread {
+                val answer = lightweightReply(q)
+                runOnUiThread {
+                    bubble("JARVİS · HAFİF MOD", answer, false, true)
+                    busy = false
+                    if (ttsReady) tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "jarvis-lite")
+                }
+            }
+            return
+        }
         busy = true; status.text = "●  Yanıt hazırlanıyor…"
         thread {
             try {
@@ -170,6 +189,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             } catch (e: Exception) {
                 runOnUiThread { bubble("SİSTEM", "Yanıt hatası: " + (e.message ?: "bilinmeyen hata"), false, true); busy = false }
             }
+        }
+    }
+
+    private fun lightweightReply(input: String): String {
+        val q = input.lowercase(Locale.ROOT)
+        return when {
+            q.contains("selam") || q.contains("merhaba") || q.contains("salam") || q == "hey" -> "Selam! 💜 Ben JARVİS. Şu an hafif çevrimdışı moddayım. Daha doğal cevaplar için ücretsiz yerel modeli indirmen gerekiyor."
+            q.contains("nasılsın") || q.contains("ne haber") -> "İyiyim, buradayım ve çalışıyorum! Model yüklü olmadığı için şu an sınırlı cevap verebiliyorum."
+            q.contains("adın") || q.contains("kimsin") -> "Ben JARVİS AI, cihazında çalışması için tasarlanan kişisel asistanım."
+            q.contains("yardım") || q.contains("ne yap") -> "Şu an hafif modda selamlaşma ve temel yönlendirme yapabiliyorum. Daha doğal sohbet için alttaki ücretsiz yerel modeli indir."
+            q.contains("saat") || q.contains("tarih") -> "Cihazındaki tarih ve saat: " + java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR")).format(java.util.Date()) + "."
+            q.contains("model") || q.contains("indir") -> "Tam sohbet motoru için yaklaşık 586 MB'lık Qwen yerel modelini indirmen gerekiyor."
+            else -> "Mesajını aldım: ‘$input’ 💜 Ancak şu an yerel dil modeli yüklü değil. Bu hafif mod gerçek üretken AI değildir; ayrıntılı cevaplar için ücretsiz model indirme düğmesini kullan."
         }
     }
 
@@ -361,7 +393,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
-    override fun onInit(code: Int) { if (code == TextToSpeech.SUCCESS) tts.language = Locale("tr", "TR") }
+    override fun onInit(code: Int) {
+        if (code == TextToSpeech.SUCCESS) {
+            tts.language = Locale("tr", "TR")
+            ttsReady = true
+        }
+    }
     override fun onDestroy() {
         try { conversation?.close() } catch (_: Exception) {}
         try { engine?.close() } catch (_: Exception) {}
