@@ -131,12 +131,53 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         setContentView(root)
     }
 
-    private fun restoreChat() {
+    private data class ChatEntry(val who: String, val text: String)
+
+    /**
+     * Store history as JSON so message text can safely contain separators, colons and newlines.
+     * Older installs are migrated from the previous delimiter-based format on first read.
+     */
+    private fun readHistory(): MutableList<ChatEntry> {
         val saved = prefs.getString("history", "").orEmpty()
-        if (saved.isBlank()) bubble("JARVİS", "Selam! Ben JARVİS. Modeli indirdiğinde cihazında yerel olarak sohbet edebiliriz.", false, false)
-        else saved.split("\n--J--\n").forEach { row ->
+        if (saved.isBlank()) return mutableListOf()
+        val entries = mutableListOf<ChatEntry>()
+        try {
+            val array = org.json.JSONArray(saved)
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                val who = item.optString("who", "")
+                val text = item.optString("text", "")
+                if (who.isNotBlank()) entries.add(ChatEntry(who, text))
+            }
+            return entries.takeLast(80).toMutableList()
+        } catch (_: Exception) {
+            // Continue below and migrate the old history representation.
+        }
+        saved.split("\\n--J--\\n").forEach { row ->
             val i = row.indexOf("::")
-            if (i > 0) bubble(row.substring(0, i), row.substring(i + 2), row.substring(0, i) == "Sen", false)
+            if (i > 0) entries.add(ChatEntry(row.substring(0, i), row.substring(i + 2)))
+        }
+        val migrated = entries.takeLast(80).toMutableList()
+        writeHistory(migrated)
+        return migrated
+    }
+
+    private fun writeHistory(entries: List<ChatEntry>) {
+        val array = org.json.JSONArray()
+        entries.takeLast(80).forEach { entry ->
+            array.put(JSONObject().put("who", entry.who).put("text", entry.text))
+        }
+        prefs.edit().putString("history", array.toString()).apply()
+    }
+
+    private fun restoreChat() {
+        val history = readHistory()
+        if (history.isEmpty()) {
+            bubble("JARVİS", "Selam! Ben JARVİS. Modeli indirdiğinde cihazında yerel olarak sohbet edebiliriz.", false, false)
+        } else {
+            history.forEach { entry ->
+                bubble(entry.who, entry.text, entry.who == "Sen", false)
+            }
         }
     }
 
@@ -158,9 +199,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         })
         messages.addView(card)
         if (save) {
-            val old = prefs.getString("history", "").orEmpty()
-            val all = (old + if (old.isEmpty()) "" else "\n--J--\n") + "$who::$text"
-            prefs.edit().putString("history", all.split("\n--J--\n").takeLast(80).joinToString("\n--J--\n")).apply()
+            val history = readHistory()
+            history.add(ChatEntry(who, text))
+            writeHistory(history)
         }
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
