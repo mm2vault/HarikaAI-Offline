@@ -1,19 +1,30 @@
-# JARVİS AI
+# Aura AI
 
-Ücretsiz, Türkçe odaklı Android asistanı. Kotlin ile geliştirilir; yerel yapay zekâ modeli APK içine gömülmez, uygulama içinde indirilir.
+Ücretsiz, Türkçe/Azerice odaklı Android kişisel asistanı. Öncelik cihaz içinde çalışan yapay zekâdır; ücretli API anahtarı varsayılan olarak kullanılmaz.
 
-## Özellikler
-- Siyah/mor neon arayüz
-- LiteRT-LM ile cihaz içi Qwen3-0.6B
-- Türkçe konuşma tanıma ve sesli yanıt (Android cihaz desteğine bağlı)
+## Temel özellikler
+- Koyu mor arayüz ve Aura AI markası
+- LiteRT-LM üzerinden cihazda Qwen3-0.6B çalıştırma denemesi
+- Model dosyasını uygulama içinden indirme (yaklaşık 586 MB)
+- Cihaz destekliyorsa konuşmayı yazıya çevirme ve Türkçe sesli yanıt
 - Sohbet geçmişini cihazda saklama
-- Tarayıcıda internet araması
-- GitHub Actions ile debug APK derleme
+- GitHub Releases üzerinden güncelleme kontrolü
 
-## Model
-Yaklaşık 586 MB boyutlu model: https://huggingface.co/litert-community/Qwen3-0.6B
+## Önemli sınırlar
+- Model indirilmeden önceki hafif mod, genel amaçlı dil modeli değildir.
+- APK derlemesinin başarılı olması modelin her telefonda çalıştığını kanıtlamaz; gerçek cihaz testi gerekir.
+- Mevcut kurulumun üzerine güncelleme için aynı applicationId ve aynı imza sertifikası gerekir. Bu dal ana dala veya mevcut yayınlara otomatik aktarılmaz.
+- Sohbet geçmişini silmeden önce dışa aktarma/yedekleme yolu hazırlanmalıdır.
 
-## APK derleme
-GitHub'da Actions sekmesini açıp Build JARVIS AI APK iş akışını çalıştır. Başarılı olursa jarvis-ai-debug-apk artifact'ini indir.
+## Geliştirme
+1. Android Studio ile projeyi aç.
+2. JDK 17 ve Android SDK platform 35 kullan.
+3. Gradle senkronizasyonu ve assembleDebug çalıştır.
+4. APK'yı gerçek cihazda test et; modeli indirip çıkarım yapabildiğini doğrula.
 
-> Bu ilk iskelettir. Gerçek cihazda derleme ve model çıkarımı doğrulanmadan üretime hazır olduğu iddia edilmez.
+## Yeniden yapılandırma
+- Görünür markayı Aura AI yapmak ve uygulama kimliğini şimdilik korumak.
+- UI, model motoru, indirme, sohbet depolama, ses ve güncelleme sorumluluklarını ayırmak.
+- İndirmeyi geçici dosya, doğrulama ve tekrar deneme ile güvenli yapmak.
+- İmza anahtarı yoksa test APK'sını yayın sürümü diye yayımlamamak.
+- Sohbet geçmişini koruma ve dışa/içe aktarma desteği eklemek.
