@@ -8,12 +8,18 @@ on:
       - 'settings.gradle.kts'
       - 'build.gradle.kts'
       - '.github/workflows/android-search-build.yml'
+      - 'README.md'
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      AURA_KEYSTORE_BASE64: ${{ secrets.AURA_KEYSTORE_BASE64 }}
+      AURA_STORE_PASSWORD: ${{ secrets.AURA_STORE_PASSWORD }}
+      AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
+      AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -23,15 +29,31 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build debug APK
+      - name: Decode stable signing key
+        if: ${{ env.AURA_KEYSTORE_BASE64 != '' && env.AURA_STORE_PASSWORD != '' && env.AURA_KEY_ALIAS != '' && env.AURA_KEY_PASSWORD != '' }}
+        run: |
+          echo "$AURA_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aura-release.jks"
+          echo "AURA_STORE_FILE=$RUNNER_TEMP/aura-release.jks" >> "$GITHUB_ENV"
+      - name: Build signed release APK
+        if: ${{ env.AURA_KEYSTORE_BASE64 != '' && env.AURA_STORE_PASSWORD != '' && env.AURA_KEY_ALIAS != '' && env.AURA_KEY_PASSWORD != '' }}
+        run: gradle --no-daemon -PbuildNumber=${{ github.run_number }} assembleRelease
+      - name: Build debug APK (fallback)
+        if: ${{ env.AURA_KEYSTORE_BASE64 == '' || env.AURA_STORE_PASSWORD == '' || env.AURA_KEY_ALIAS == '' || env.AURA_KEY_PASSWORD == '' }}
         run: gradle --no-daemon -PbuildNumber=${{ github.run_number }} assembleDebug
-      - name: Rename APK for direct download
-        run: cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/Aura-AI-debug.apk
+      - name: Prepare APK for download
+        run: |
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/Aura-AI.apk
+            echo "APK_KIND=stable-signed-release" >> "$GITHUB_ENV"
+          else
+            cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/Aura-AI.apk
+            echo "APK_KIND=debug-fallback" >> "$GITHUB_ENV"
+          fi
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Aura-AI-APK
-          path: app/build/outputs/apk/debug/Aura-AI-debug.apk
+          path: app/build/outputs/apk/Aura-AI.apk
           if-no-files-found: error
           retention-days: 7
       - name: Publish direct APK download
@@ -39,8 +61,11 @@ jobs:
         with:
           tag_name: aura-build-${{ github.run_number }}
           name: Aura AI APK build ${{ github.run_number }}
-          body: Automated debug APK build from the development branch. Not merged into main.
+          body: |
+            Automated APK build from the development branch.
+            Signing mode: ${{ env.AURA_KEYSTORE_BASE64 != '' && env.AURA_STORE_PASSWORD != '' && env.AURA_KEY_ALIAS != '' && env.AURA_KEY_PASSWORD != '' && 'stable release signing' || 'debug fallback; may not update an existing installation' }}.
+            Not merged into main.
           prerelease: true
-          files: app/build/outputs/apk/debug/Aura-AI-debug.apk
+          files: app/build/outputs/apk/Aura-AI.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
