@@ -29,26 +29,24 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Require persistent signing key
+        run: |
+          test -n "$AURA_KEYSTORE_BASE64" || (echo "Missing GitHub secret AURA_KEYSTORE_BASE64" && exit 1)
+          test -n "$AURA_STORE_PASSWORD" || (echo "Missing GitHub secret AURA_STORE_PASSWORD" && exit 1)
+          test -n "$AURA_KEY_ALIAS" || (echo "Missing GitHub secret AURA_KEY_ALIAS" && exit 1)
+          test -n "$AURA_KEY_PASSWORD" || (echo "Missing GitHub secret AURA_KEY_PASSWORD" && exit 1)
       - name: Decode stable signing key
-        if: ${{ env.AURA_KEYSTORE_BASE64 != '' && env.AURA_STORE_PASSWORD != '' && env.AURA_KEY_ALIAS != '' && env.AURA_KEY_PASSWORD != '' }}
         run: |
           echo "$AURA_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aura-release.jks"
+          test -s "$RUNNER_TEMP/aura-release.jks"
           echo "AURA_STORE_FILE=$RUNNER_TEMP/aura-release.jks" >> "$GITHUB_ENV"
       - name: Build signed release APK
-        if: ${{ env.AURA_KEYSTORE_BASE64 != '' && env.AURA_STORE_PASSWORD != '' && env.AURA_KEY_ALIAS != '' && env.AURA_KEY_PASSWORD != '' }}
         run: gradle --no-daemon -PbuildNumber=${{ github.run_number }} assembleRelease
-      - name: Build debug APK (fallback)
-        if: ${{ env.AURA_KEYSTORE_BASE64 == '' || env.AURA_STORE_PASSWORD == '' || env.AURA_KEY_ALIAS == '' || env.AURA_KEY_PASSWORD == '' }}
-        run: gradle --no-daemon -PbuildNumber=${{ github.run_number }} assembleDebug
-      - name: Prepare APK for download
+      - name: Prepare and verify Aura APK
         run: |
-          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/Aura-AI.apk
-            echo "APK_KIND=stable-signed-release" >> "$GITHUB_ENV"
-          else
-            cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/Aura-AI.apk
-            echo "APK_KIND=debug-fallback" >> "$GITHUB_ENV"
-          fi
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/Aura-AI.apk
+          apksigner verify --print-certs app/build/outputs/apk/Aura-AI.apk
+          echo "APK_KIND=stable-signed-release" >> "$GITHUB_ENV"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -63,7 +61,7 @@ jobs:
           name: Aura AI APK build ${{ github.run_number }}
           body: |
             Automated APK build from the development branch.
-            Signing mode: ${{ env.AURA_KEYSTORE_BASE64 != '' && env.AURA_STORE_PASSWORD != '' && env.AURA_KEY_ALIAS != '' && env.AURA_KEY_PASSWORD != '' && 'stable release signing' || 'debug fallback; may not update an existing installation' }}.
+            Signing mode: persistent release key required; debug fallback is disabled.
             Not merged into main.
           prerelease: true
           files: app/build/outputs/apk/Aura-AI.apk
