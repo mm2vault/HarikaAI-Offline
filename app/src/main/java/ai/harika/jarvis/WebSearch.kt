@@ -58,11 +58,11 @@ object WebSearch {
 
             // The class and href attributes may appear in either order.
             val anchorRegex = Regex(
-                """(?is)<a\\b(?=[^>]*\\bclass\\s*=\\s*["'][^"']*\\bresult__a\\b[^"']*["'])[^>]*>(.*?)</a>"""
+                """(?is)<a\b(?=[^>]*\bclass\s*=\s*["'][^"']*\bresult__a\b[^"']*["'])[^>]*>(.*?)</a>"""
             )
-            val hrefRegex = Regex("""(?is)\\bhref\\s*=\\s*["']([^"']+)["']""")
+            val hrefRegex = Regex("""(?is)\bhref\s*=\s*["']([^"']+)["']""")
             val snippetRegex = Regex(
-                """(?is)class\\s*=\\s*["'][^"']*\\bresult__snippet\\b[^"']*["'][^>]*>(.*?)</(?:a|div|span)>"""
+                """(?is)class\s*=\s*["'][^"']*\bresult__snippet\b[^"']*["'][^>]*>(.*?)</(?:a|div|span)>"""
             )
             val links = anchorRegex.findAll(html).toList()
             val results = mutableListOf<WebSearchResult>()
