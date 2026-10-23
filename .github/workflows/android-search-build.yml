@@ -1,4 +1,4 @@
-name: JARVİS Android Search Build
+name: Aura AI Android APK Build
 on:
   push:
     branches: ['brain/phase-3-android-search']
@@ -10,7 +10,7 @@ on:
       - '.github/workflows/android-search-build.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,10 +25,22 @@ jobs:
           gradle-version: '8.9'
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
-      - name: Upload debug APK
+      - name: Rename APK for direct download
+        run: cp app/build/outputs/apk/debug/*.apk app/build/outputs/apk/debug/Aura-AI-debug.apk
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jarvis-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: Aura-AI-APK
+          path: app/build/outputs/apk/debug/Aura-AI-debug.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Publish direct APK download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: aura-build-${{ github.run_number }}
+          name: Aura AI APK build ${{ github.run_number }}
+          body: Automated debug APK build from the development branch. Not merged into main.
+          prerelease: true
+          files: app/build/outputs/apk/debug/Aura-AI-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
