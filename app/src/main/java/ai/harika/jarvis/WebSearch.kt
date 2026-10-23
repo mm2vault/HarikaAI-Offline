@@ -1,7 +1,6 @@
 package ai.harika.jarvis
 
 import android.text.Html
-import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -35,7 +34,7 @@ object WebSearch {
             val html = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText().take(2_000_000) }
             val results = mutableListOf<WebSearchResult>()
             val blocks = Regex(
-                """(?is)<div[^>]*class=["'][^"']*result[^"']*["'][^>]*>(.*?)(?=<div[^>]*class=["'][^"']*result[^"']*["']|$)"""
+                """(?is)<div[^>]*class=["'][^"']*result[^"']*["'][^>]*>(.*?)(?=<div[^>]*class=["'][^"']*result[^"']*["']|\\z)\"\"\"
             )
             val linkRegex = Regex("""(?is)<a[^>]*class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>""")
             val snippetRegex = Regex("""(?is)<(?:a|div)[^>]*class=["'][^"']*result__snippet[^"']*["'][^>]*>(.*?)</(?:a|div)>""")
