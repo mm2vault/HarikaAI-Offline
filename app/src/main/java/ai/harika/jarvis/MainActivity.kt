@@ -41,7 +41,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val cyan = Color.rgb(119, 226, 255)
     private val modelName = "Qwen3-0.6B.litertlm"
     private val modelUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm"
-    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases?per_page=1"
+    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases?per_page=30"
     private val releasesPage = "https://github.com/mm2vault/HarikaAI-Offline/releases"
     private val channelId = "aura_notifications"
     private lateinit var messages: LinearLayout
@@ -316,7 +316,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         return when {
             q.contains("selam") || q.contains("merhaba") || q.contains("salam") || q == "hey" -> "Selam! Ben Aura AI. Şu an hafif çevrimdışı moddayım. Daha doğal cevaplar için ücretsiz yerel modeli indirmen gerekiyor."
             q.contains("nasılsın") || q.contains("ne haber") -> "İyiyim, buradayım ve çalışıyorum! Model yüklü olmadığı için şu an sınırlı cevap verebiliyorum."
-            q.contains("adın") || q.contains("kimsin") -> "Ben Aura AI AI, cihazında çalışması için tasarlanan kişisel asistanım."
+            q.contains("adın") || q.contains("kimsin") -> "Ben Aura AI, cihazında çalışması için tasarlanan kişisel asistanım."
             q.contains("yardım") || q.contains("ne yap") -> "Şu an hafif modda selamlaşma ve temel yönlendirme yapabiliyorum. Daha doğal sohbet için alttaki ücretsiz yerel modeli indir."
             q.contains("saat") || q.contains("tarih") -> "Cihazındaki tarih ve saat: " + java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR")).format(java.util.Date()) + "."
             q.contains("model") || q.contains("indir") -> "Tam sohbet motoru için yaklaşık 586 MB'lık Qwen yerel modelini indirmen gerekiyor."
@@ -380,37 +380,63 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         thread {
             try {
                 val c = URL(releasesApi).openConnection() as HttpURLConnection
-                c.connectTimeout = 8000; c.readTimeout = 8000
+                c.connectTimeout = 10000
+                c.readTimeout = 10000
                 c.setRequestProperty("Accept", "application/vnd.github+json")
                 c.setRequestProperty("User-Agent", "AuraAI-Android")
-                if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val releaseList = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() }); c.disconnect()
-                val json = releaseList.optJSONObject(0) ?: error("Henüz yayınlanmış sürüm yok.")
-                val tag = json.optString("tag_name", "")
-                val assets = json.optJSONArray("assets")
-                var apk = ""
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val a = assets.optJSONObject(i) ?: continue
-                    if (a.optString("name").endsWith(".apk", true)) { apk = a.optString("browser_download_url"); break }
+                val code = c.responseCode
+                if (code !in 200..299) {
+                    c.disconnect()
+                    error("GitHub HTTP $code")
                 }
+                val releaseList = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() })
+                c.disconnect()
+
+                // Ignore legacy releases such as "jarvis-latest". Only Aura builds with an APK count.
+                val candidates = (0 until releaseList.length()).mapNotNull { index ->
+                    val release = releaseList.optJSONObject(index) ?: return@mapNotNull null
+                    val tag = release.optString("tag_name", "")
+                    val match = Regex("^aura-build-(\\d+)$").matchEntire(tag) ?: return@mapNotNull null
+                    val releaseCode = match.groupValues[1].toLongOrNull() ?: return@mapNotNull null
+                    val assets = release.optJSONArray("assets") ?: return@mapNotNull null
+                    var apkUrl: String? = null
+                    for (assetIndex in 0 until assets.length()) {
+                        val asset = assets.optJSONObject(assetIndex) ?: continue
+                        val name = asset.optString("name", "")
+                        val url = asset.optString("browser_download_url", "")
+                        if (name.endsWith(".apk", ignoreCase = true) && url.startsWith("https://github.com/")) {
+                            apkUrl = url
+                            break
+                        }
+                    }
+                    if (apkUrl.isNullOrBlank()) null else Triple(releaseCode, release, apkUrl)
+                }
+                val latest = candidates.maxByOrNull { it.first }
+                if (latest == null) error("Aura AI APK sürümü bulunamadı.")
+                val (releaseCode, release, apkUrl) = latest
                 val packageInfo = packageManager.getPackageInfo(packageName, 0)
                 val currentCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else packageInfo.versionCode.toLong()
-                val releaseCode = tag.substringAfterLast("-").toLongOrNull() ?: 0L
                 val current = packageInfo.versionName ?: "bilinmiyor"
+
                 runOnUiThread {
-                    if (releaseCode > currentCode && apk.isNotBlank()) updateDialog(tag, json.optString("body", "Yeni sürüm hazır."), apk)
-                    else if (!silent) info("Güncelleme kontrolü", "Yeni sürüm bulunamadı. Mevcut sürüm: $current (build $currentCode)")
+                    if (releaseCode > currentCode) {
+                        updateDialog(release.optString("tag_name", "Aura AI"), release.optString("body", "Yeni sürüm hazır."), apkUrl)
+                    } else if (!silent) {
+                        info("Güncelleme kontrolü", "Yeni Aura AI sürümü bulunamadı. Mevcut sürüm: $current (build $currentCode).")
+                    }
                 }
             } catch (e: Exception) {
-                runOnUiThread { if (!silent) info("Güncelleme kontrol edilemedi", "Uygulama güncellemesi için herkese açık GitHub Release kaynağı gerekir.\n\n" + (e.message ?: "Bağlantı hatası")) }
+                runOnUiThread {
+                    if (!silent) info("Güncelleme kontrol edilemedi", "GitHub Release kaynağına ulaşılamadı.\\n\\n" + (e.message ?: "Bağlantı hatası"))
+                }
             }
         }
     }
 
     private fun updateDialog(version: String, notes: String, apk: String) {
-        notifyUser("Yeni güncelleme geldi", "Aura AI AI $version sürümü hazır.")
+        notifyUser("Yeni güncelleme geldi", "Aura AI $version sürümü hazır.")
         AlertDialog.Builder(this).setTitle("Yeni güncelleme geldi")
-            .setMessage("Aura AI AI $version\n\n" + notes.take(700) + "\n\nGüncellemeyi indirip Android yükleme ekranını açalım mı?")
+            .setMessage("Aura AI $version\n\n" + notes.take(700) + "\n\nGüncellemeyi indirip Android yükleme ekranını açalım mı?")
             .setNegativeButton("Daha sonra", null)
             .setPositiveButton("Güncellemeyi indir") { _, _ -> downloadUpdate(apk) }.show()
     }
@@ -427,7 +453,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 runOnUiThread {
                     if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
                         AlertDialog.Builder(this).setTitle("Yükleme izni gerekli")
-                            .setMessage("Android ayarlarından Aura AI AI için bu kaynaktan uygulama yükleme iznini aç.")
+                            .setMessage("Android ayarlarından Aura AI için bu kaynaktan uygulama yükleme iznini aç.")
                             .setPositiveButton("Ayarları aç") { _, _ -> startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))) }
                             .setNegativeButton("İptal", null).show()
                     } else {
@@ -441,7 +467,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun settings() {
-        AlertDialog.Builder(this).setTitle("Aura AI AI · Ayarlar")
+        AlertDialog.Builder(this).setTitle("Aura AI · Ayarlar")
             .setItems(arrayOf("Sohbet geçmişini temizle", "Güncellemeleri kontrol et", "GitHub sürümleri")) { _, i ->
                 when (i) {
                     0 -> AlertDialog.Builder(this).setTitle("Geçmiş silinsin mi?").setMessage("Bu cihazdaki sohbet geçmişi silinecek.")
