@@ -36,7 +36,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val pink = Color.rgb(255, 105, 205)
     private val modelName = "Qwen3-0.6B.litertlm"
     private val modelUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm"
-    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases/latest"
+    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases?per_page=50"
     private val releasesPage = "https://github.com/mm2vault/HarikaAI-Offline/releases"
     private val channelId = "aura_notifications"
     private lateinit var messages: LinearLayout
@@ -291,25 +291,77 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         thread {
             try {
                 val c = URL(releasesApi).openConnection() as HttpURLConnection
-                c.connectTimeout = 8000; c.readTimeout = 8000
+                c.connectTimeout = 10000
+                c.readTimeout = 10000
                 c.setRequestProperty("Accept", "application/vnd.github+json")
                 c.setRequestProperty("User-Agent", "AuraAI-Android")
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val json = JSONObject(c.inputStream.bufferedReader().use { it.readText() }); c.disconnect()
-                val tag = json.optString("tag_name", "")
-                val assets = json.optJSONArray("assets")
-                var apk = ""
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val a = assets.optJSONObject(i) ?: continue
-                    if (a.optString("name").endsWith(".apk", true)) { apk = a.optString("browser_download_url"); break }
+                val releases = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() })
+                c.disconnect()
+
+                fun versionParts(value: String): List<Int>? {
+                    val match = Regex("^aura-v(\\d+)\\.(\\d+)\\.(\\d+)$").matchEntire(value) ?: return null
+                    return match.groupValues.drop(1).map { it.toIntOrNull() ?: return null }
                 }
-                val current = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
+                fun compareVersions(a: List<Int>, b: List<Int>): Int {
+                    for (i in 0..2) {
+                        if (a[i] != b[i]) return a[i].compareTo(b[i])
+                    }
+                    return 0
+                }
+
+                val installed = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
+                val installedParts = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)$")
+                    .matchEntire(installed)?.groupValues?.drop(1)?.map { it.toInt() }
+                if (installedParts == null) error("Yüklü sürüm numarası MAJOR.MINOR.PATCH biçiminde değil: $installed")
+
+                var newestTag = ""
+                var newestNotes = ""
+                var newestApk = ""
+                var newestParts: List<Int>? = null
+                for (i in 0 until releases.length()) {
+                    val release = releases.optJSONObject(i) ?: continue
+                    if (release.optBoolean("draft", false) || release.optBoolean("prerelease", false)) continue
+                    val tag = release.optString("tag_name", "")
+                    val parts = versionParts(tag) ?: continue
+                    val assets = release.optJSONArray("assets") ?: continue
+                    var apkUrl = ""
+                    for (j in 0 until assets.length()) {
+                        val asset = assets.optJSONObject(j) ?: continue
+                        val name = asset.optString("name", "")
+                        val url = asset.optString("browser_download_url", "")
+                        if (name.endsWith(".apk", true) && url.startsWith("https://github.com/")) {
+                            apkUrl = url
+                            break
+                        }
+                    }
+                    if (apkUrl.isBlank()) continue
+                    if (newestParts == null || compareVersions(parts, newestParts!!) > 0) {
+                        newestTag = tag
+                        newestNotes = release.optString("body", "Yeni sürüm hazır.")
+                        newestApk = apkUrl
+                        newestParts = parts
+                    }
+                }
+
                 runOnUiThread {
-                    if (tag.isNotBlank() && tag.removePrefix("v") != current && apk.isNotBlank()) updateDialog(tag, json.optString("body", "Yeni sürüm hazır."), apk)
-                    else if (!silent) info("Güncelleme kontrolü", "Yeni sürüm bulunamadı. Mevcut sürüm: $current")
+                    val available = newestParts
+                    if (available != null && compareVersions(available, installedParts) > 0) {
+                        updateDialog(newestTag, newestNotes, newestApk)
+                    } else if (!silent) {
+                        val message = if (available == null) {
+                            "Henüz aura-vMAJOR.MINOR.PATCH biçiminde kararlı bir APK yayımlanmamış.\n\nMevcut sürüm: $installed"
+                        } else {
+                            "Aura AI güncel.\nMevcut sürüm: $installed\nEn yeni yayımlanan sürüm: $newestTag"
+                        }
+                        info("Güncelleme kontrolü", message)
+                    }
                 }
             } catch (e: Exception) {
-                runOnUiThread { if (!silent) info("Güncelleme kontrol edilemedi", "Uygulama güncellemesi için herkese açık GitHub Release kaynağı gerekir.\n\n" + (e.message ?: "Bağlantı hatası")) }
+                runOnUiThread {
+                    if (!silent) info("Güncelleme kontrol edilemedi",
+                        "GitHub sürüm bilgisi okunamadı. İnternet bağlantını kontrol et.\n\n" + (e.message ?: "Bağlantı hatası"))
+                }
             }
         }
     }
