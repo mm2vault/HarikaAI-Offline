@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+val buildNumber = providers.gradleProperty("buildNumber").orNull?.toIntOrNull() ?: 1
 android {
     namespace = "ai.harika.jarvis"
     compileSdk = 35
@@ -9,8 +10,8 @@ android {
         applicationId = "ai.harika.jarvis"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = buildNumber
+        versionName = "0.1.$buildNumber"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
