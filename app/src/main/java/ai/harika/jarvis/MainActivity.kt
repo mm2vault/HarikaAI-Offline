@@ -5,6 +5,10 @@ import android.app.*
 import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -39,7 +43,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val modelUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm"
     private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases/latest"
     private val releasesPage = "https://github.com/mm2vault/HarikaAI-Offline/releases"
-    private val channelId = "jarvis_notifications"
+    private val channelId = "aura_notifications"
     private lateinit var messages: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var prompt: EditText
@@ -49,7 +53,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var conversation: Conversation? = null
     private var busy = false
     private var ttsReady = false
-    private val prefs by lazy { getSharedPreferences("jarvis", MODE_PRIVATE) }
+    private val prefs by lazy { getSharedPreferences("aura_ai", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,7 +67,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         restoreChat()
         val savedModel = File(filesDir, modelName)
         if (savedModel.exists() && savedModel.length() > 100_000_000L) {
-            status.text = "●  Kayıtlı model bulundu; başlatılıyor…"
+            status.text = "Kayıtlı model bulundu; başlatılıyor…"
             initializeModel(savedModel)
         }
         checkUpdates(true)
@@ -73,43 +77,40 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val root = LinearLayout(this).apply { orientation = 1; setPadding(dp(16), dp(10), dp(16), dp(10)); setBackgroundColor(bg) }
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; orientation = 0; setPadding(0, dp(4), 0, dp(14)) }
         header.addView(TextView(this).apply {
-            text = "✦"; textSize = 30f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            text = ""; contentDescription = "Aura AI"; textSize = 30f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
             elevation = dp(4).toFloat()
             background = gradient(intArrayOf(Color.rgb(150, 79, 241), Color.rgb(57, 39, 119)), 18)
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         val brand = LinearLayout(this).apply { orientation = 1; setPadding(dp(12), 0, 0, 0) }
         brand.addView(label("Aura AI", 23f, Color.WHITE, true))
-        brand.addView(label("KİŞİSEL YAPAY ZEKÂ · BETA", 10f, cyan, true))
+        brand.addView(label("KİŞİSEL YAPAY ZEKÂ", 10f, cyan, true))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(button("⚙", false) { settings() })
+        header.addView(button("Ayarlar", false) { settings() })
         root.addView(header)
 
         val hero = LinearLayout(this).apply {
             orientation = 1; gravity = Gravity.CENTER; setPadding(dp(16), dp(17), dp(16), dp(17))
-            background = gradient(intArrayOf(Color.rgb(58, 34, 98), Color.rgb(20, 17, 37)), 24)
+            background = gradient(intArrayOf(Color.rgb(44, 28, 76), Color.rgb(19, 16, 32)), 26)
             elevation = dp(2).toFloat()
         }
-        hero.addView(TextView(this).apply {
-            text = "✧"; textSize = 44f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-            background = gradient(intArrayOf(Color.rgb(198, 136, 255), Color.rgb(82, 56, 185)), 100)
-        }, LinearLayout.LayoutParams(dp(78), dp(78)).apply { bottomMargin = dp(12) })
+        hero.addView(AuraOrbView(this), LinearLayout.LayoutParams(dp(104), dp(104)).apply { bottomMargin = dp(12) })
         hero.addView(label("Nasıl yardımcı olabilirim?", 20f, Color.WHITE, true))
-        hero.addView(label("Sor, düşün, üret. Sohbetlerin cihazında kalır.", 12f, Color.rgb(194, 184, 215), false))
+        hero.addView(label("Düşüncelerini keşfet. Fikirlerini gerçeğe dönüştür.", 12f, Color.rgb(194, 184, 215), false))
         hero.addView(label("MODEL YOKSA HAFİF MOD · MODELLE TAM SOHBET", 9f, Color.rgb(190, 154, 255), true))
-        status = label("●  Model henüz yüklenmedi", 12f, Color.rgb(255, 204, 123), true)
+        status = label("Model henüz yüklenmedi", 12f, Color.rgb(255, 204, 123), true)
         (status.layoutParams as? LinearLayout.LayoutParams)?.gravity = Gravity.CENTER
         hero.addView(status)
         root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
         val updatePanel = LinearLayout(this).apply {
             orientation = 1; setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = rounded(panel, 17, Color.rgb(62, 49, 85))
+            background = gradient(intArrayOf(Color.rgb(29, 23, 48), Color.rgb(18, 16, 31)), 20)
         }
         val updateRow = LinearLayout(this).apply { orientation = 0; gravity = Gravity.CENTER_VERTICAL }
         updateRow.addView(label("GÜNCELLEMELER", 11f, cyan, true), LinearLayout.LayoutParams(0, -2, 1f))
         updateRow.addView(button("Kontrol et", true) { checkUpdates(false) })
         updatePanel.addView(updateRow)
-        updatePanel.addView(label("Yeni sürüm varsa burada haber verilir.", 12f, Color.LTGRAY, false))
+        updatePanel.addView(label("Sürüm denetimi ve güvenli APK kurulumu", 12f, Color.LTGRAY, false))
         root.addView(updatePanel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
         // Quick actions are lightweight native views; no extra library is needed.
@@ -119,9 +120,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(8))
         }
-        listOf("💡 Fikir üret", "💻 Kod yaz", "🔎 Webde ara: AI haberleri").forEach { suggestion ->
+        listOf("Fikir üret", "Kod yaz", "Webde ara: AI haberleri").forEach { suggestion ->
             val chip = button(suggestion, false) {
-                if (suggestion.startsWith("🔎")) {
+                if (suggestion.startsWith("Webde ara")) {
                     prompt.setText("Webde ara: AI haberleri")
                     sendMessage()
                 } else {
@@ -140,18 +141,18 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         scroll.addView(messages)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
-        root.addView(button("⬇  Ücretsiz AI modelini indir / başlat  ·  ~586 MB", true) { downloadModel() },
+        root.addView(button("Ücretsiz AI modelini indir / başlat · yaklaşık 586 MB", true) { downloadModel() },
             LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8); bottomMargin = dp(8) })
         val composer = LinearLayout(this).apply { orientation = 0; gravity = Gravity.CENTER_VERTICAL }
         prompt = EditText(this).apply {
             hint = "Aura AI’ye mesaj yaz…"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE); textSize = 15f
             maxLines = 4; imeOptions = EditorInfo.IME_ACTION_SEND; setPadding(dp(12), dp(9), dp(12), dp(9))
-            background = rounded(Color.rgb(31, 26, 46), 16, Color.rgb(76, 61, 100))
+            background = rounded(Color.rgb(25, 22, 39), 18, Color.rgb(103, 78, 145))
             setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_SEND) { sendMessage(); true } else false }
         }
         composer.addView(prompt, LinearLayout.LayoutParams(0, -2, 1f))
-        composer.addView(button("🎙", false) { voice() })
-        composer.addView(button("➤", true) { sendMessage() })
+        composer.addView(button("Sesli", false) { voice() })
+        composer.addView(button("Gönder", true) { sendMessage() })
         root.addView(composer)
         setContentView(root)
     }
@@ -198,7 +199,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun restoreChat() {
         val history = readHistory()
         if (history.isEmpty()) {
-            bubble("JARVİS", "Selam! Ben JARVİS. Modeli indirdiğinde cihazında yerel olarak sohbet edebiliriz.", false, false)
+            bubble("AURA AI", "Selam! Ben Aura AI. Modeli indirdiğinde cihazında yerel olarak sohbet edebiliriz.", false, false)
         } else {
             history.forEach { entry ->
                 bubble(entry.who, entry.text, entry.who == "Sen", false)
@@ -209,7 +210,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun bubble(who: String, text: String, user: Boolean, save: Boolean) {
         val card = LinearLayout(this).apply {
             orientation = 1; setPadding(dp(14), dp(11), dp(14), dp(11))
-            background = rounded(if (user) Color.rgb(66, 42, 105) else Color.rgb(25, 20, 41), 18, if (user) Color.rgb(132, 91, 181) else Color.rgb(65, 50, 91))
+            background = rounded(if (user) Color.rgb(66, 42, 105) else Color.rgb(22, 19, 36), 18, if (user) Color.rgb(132, 91, 181) else Color.rgb(78, 60, 112))
             elevation = dp(1).toFloat()
             layoutParams = LinearLayout.LayoutParams(if (user) (resources.displayMetrics.widthPixels * .78f).toInt() else -1, -2).apply {
                 gravity = if (user) Gravity.END else Gravity.START; bottomMargin = dp(8)
@@ -240,7 +241,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val webQuery = extractWebQuery(q)
         if (webQuery != null) {
             busy = true
-            status.text = "●  İnternette aranıyor…"
+            status.text = "İnternette aranıyor…"
             thread {
                 try {
                     val results = WebSearch.search(webQuery)
@@ -252,14 +253,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         }.joinToString("\n\n")
                     }
                     runOnUiThread {
-                        bubble("JARVİS · WEB ARAMA", answer, false, true)
-                        status.text = if (results.isEmpty()) "●  Arama tamamlandı · sonuç yok" else "●  İnternet araması tamamlandı"
+                        bubble("AURA AI · WEB ARAMA", answer, false, true)
+                        status.text = if (results.isEmpty()) "Arama tamamlandı · sonuç yok" else "İnternet araması tamamlandı"
                         busy = false
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         bubble("WEB ARAMA", "İnternette arama yapılamadı. Bağlantını kontrol edip tekrar dene.\nAyrıntı: ${e.message ?: "bağlantı hatası"}", false, true)
-                        status.text = "●  İnternet araması kullanılamıyor"
+                        status.text = "İnternet araması kullanılamıyor"
                         busy = false
                     }
                 }
@@ -269,25 +270,25 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val conv = conversation
         if (conv == null) {
             busy = true
-            status.text = "●  Hafif çevrimdışı mod · model yok"
+            status.text = "Hafif çevrimdışı mod · model yok"
             thread {
                 val answer = lightweightReply(q)
                 runOnUiThread {
-                    bubble("JARVİS · HAFİF MOD", answer, false, true)
+                    bubble("AURA AI · HAFİF MOD", answer, false, true)
                     busy = false
                     if (ttsReady) tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "jarvis-lite")
                 }
             }
             return
         }
-        busy = true; status.text = "●  Yanıt hazırlanıyor…"
+        busy = true; status.text = "Yanıt hazırlanıyor…"
         thread {
             try {
                 val answer = conv.sendMessage(q).toString().trim()
                 runOnUiThread {
-                    bubble("JARVİS", answer, false, true)
-                    status.text = "●  Yerel yapay zekâ hazır"; status.setTextColor(cyan)
-                    tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "jarvis")
+                    bubble("AURA AI", answer, false, true)
+                    status.text = "Yerel yapay zekâ hazır"; status.setTextColor(cyan)
+                    tts.speak(answer, TextToSpeech.QUEUE_FLUSH, null, "aura_ai")
                     busy = false
                 }
             } catch (e: Exception) {
@@ -317,19 +318,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun lightweightReply(input: String): String {
         val q = input.lowercase(Locale.ROOT)
         return when {
-            q.contains("selam") || q.contains("merhaba") || q.contains("salam") || q == "hey" -> "Selam! 💜 Ben JARVİS. Şu an hafif çevrimdışı moddayım. Daha doğal cevaplar için ücretsiz yerel modeli indirmen gerekiyor."
+            q.contains("selam") || q.contains("merhaba") || q.contains("salam") || q == "hey" -> "Selam! Ben Aura AI. Şu an hafif çevrimdışı moddayım. Daha doğal cevaplar için ücretsiz yerel modeli indirmen gerekiyor."
             q.contains("nasılsın") || q.contains("ne haber") -> "İyiyim, buradayım ve çalışıyorum! Model yüklü olmadığı için şu an sınırlı cevap verebiliyorum."
-            q.contains("adın") || q.contains("kimsin") -> "Ben JARVİS AI, cihazında çalışması için tasarlanan kişisel asistanım."
+            q.contains("adın") || q.contains("kimsin") -> "Ben Aura AI AI, cihazında çalışması için tasarlanan kişisel asistanım."
             q.contains("yardım") || q.contains("ne yap") -> "Şu an hafif modda selamlaşma ve temel yönlendirme yapabiliyorum. Daha doğal sohbet için alttaki ücretsiz yerel modeli indir."
             q.contains("saat") || q.contains("tarih") -> "Cihazındaki tarih ve saat: " + java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR")).format(java.util.Date()) + "."
             q.contains("model") || q.contains("indir") -> "Tam sohbet motoru için yaklaşık 586 MB'lık Qwen yerel modelini indirmen gerekiyor."
-            else -> "Mesajını aldım: ‘$input’ 💜 Ancak şu an yerel dil modeli yüklü değil. Bu hafif mod gerçek üretken AI değildir; ayrıntılı cevaplar için ücretsiz model indirme düğmesini kullan."
+            else -> "Mesajını aldım: ‘$input’ Ancak şu an yerel dil modeli yüklü değil. Bu hafif mod gerçek üretken AI değildir; ayrıntılı cevaplar için ücretsiz model indirme düğmesini kullan."
         }
     }
 
     private fun downloadModel() {
         if (busy) return
-        status.text = "●  Model indiriliyor… Wi-Fi önerilir"
+        status.text = "Model indiriliyor… Wi-Fi önerilir"
         thread {
             try {
                 val file = File(filesDir, modelName)
@@ -346,7 +347,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                             dst.write(buf, 0, n); count += n
                             if (total > 0 && count % (5L * 1024 * 1024) < buf.size) {
                                 val percent = count * 100 / total
-                                runOnUiThread { status.text = "●  Model indiriliyor… $percent%" }
+                                runOnUiThread { status.text = "Model indiriliyor… $percent%" }
                             }
                         }
                     } }
@@ -354,9 +355,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     if (part.length() < 100_000_000L) error("İndirilen dosya eksik.")
                     if (!part.renameTo(file)) error("Dosya kaydedilemedi.")
                 }
-                runOnUiThread { status.text = "●  Model başlatılıyor…"; initializeModel(file) }
+                runOnUiThread { status.text = "Model başlatılıyor…"; initializeModel(file) }
             } catch (e: Exception) {
-                runOnUiThread { status.text = "●  İndirme başarısız"; bubble("SİSTEM", "Model indirilemedi: " + (e.message ?: "bağlantı hatası"), false, true) }
+                runOnUiThread { status.text = "İndirme başarısız"; bubble("SİSTEM", "Model indirilemedi: " + (e.message ?: "bağlantı hatası"), false, true) }
             }
         }
     }
@@ -366,15 +367,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             try {
                 val e = Engine(EngineConfig(modelPath = file.absolutePath, backend = Backend.CPU()))
                 e.initialize()
-                val c = e.createConversation(ConversationConfig(systemInstruction = Contents.of("Sen JARVİS adlı Türkçe kişisel asistansın. Doğru, açık ve güvenli yanıt ver. Bilmediğin bilgiyi uydurma. Türkçe konuş.")))
+                val c = e.createConversation(ConversationConfig(systemInstruction = Contents.of("Sen Aura AI adlı Türkçe kişisel asistansın. Doğru, açık ve güvenli yanıt ver. Bilmediğin bilgiyi uydurma. Türkçe konuş.")))
                 engine = e; conversation = c
                 runOnUiThread {
-                    status.text = "●  Yerel yapay zekâ hazır"; status.setTextColor(cyan)
-                    notifyUser("JARVİS hazır", "Yerel yapay zekâ modeli kullanıma hazır.")
-                    bubble("JARVİS", "Model hazır! Artık sohbet edebiliriz.", false, true)
+                    status.text = "Yerel yapay zekâ hazır"; status.setTextColor(cyan)
+                    notifyUser("Aura AI hazır", "Yerel yapay zekâ modeli kullanıma hazır.")
+                    bubble("AURA AI", "Model hazır! Artık sohbet edebiliriz.", false, true)
                 }
             } catch (e: Exception) {
-                runOnUiThread { status.text = "●  Model başlatılamadı"; bubble("SİSTEM", "Model hatası: " + (e.message ?: "uyumsuz model"), false, true) }
+                runOnUiThread { status.text = "Model başlatılamadı"; bubble("SİSTEM", "Model hatası: " + (e.message ?: "uyumsuz model"), false, true) }
             }
         }
     }
@@ -385,7 +386,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 val c = URL(releasesApi).openConnection() as HttpURLConnection
                 c.connectTimeout = 8000; c.readTimeout = 8000
                 c.setRequestProperty("Accept", "application/vnd.github+json")
-                c.setRequestProperty("User-Agent", "JarvisAI-Android")
+                c.setRequestProperty("User-Agent", "AuraAI-Android")
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
                 val json = JSONObject(c.inputStream.bufferedReader().use { it.readText() }); c.disconnect()
                 val tag = json.optString("tag_name", "")
@@ -407,26 +408,26 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun updateDialog(version: String, notes: String, apk: String) {
-        notifyUser("Yeni güncelleme geldi", "JARVİS AI $version sürümü hazır.")
-        AlertDialog.Builder(this).setTitle("✦ Yeni güncelleme geldi")
-            .setMessage("JARVİS AI $version\n\n" + notes.take(700) + "\n\nGüncellemeyi indirip Android yükleme ekranını açalım mı?")
+        notifyUser("Yeni güncelleme geldi", "Aura AI AI $version sürümü hazır.")
+        AlertDialog.Builder(this).setTitle("Yeni güncelleme geldi")
+            .setMessage("Aura AI AI $version\n\n" + notes.take(700) + "\n\nGüncellemeyi indirip Android yükleme ekranını açalım mı?")
             .setNegativeButton("Daha sonra", null)
             .setPositiveButton("Güncellemeyi indir") { _, _ -> downloadUpdate(apk) }.show()
     }
 
     private fun downloadUpdate(url: String) {
-        status.text = "●  Güncelleme indiriliyor…"
+        status.text = "Güncelleme indiriliyor…"
         thread {
             try {
                 val c = URL(url).openConnection() as HttpURLConnection
                 c.connectTimeout = 15000; c.readTimeout = 90000; c.instanceFollowRedirects = true
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val apk = File(getExternalFilesDir(null), "jarvis-update.apk")
+                val apk = File(getExternalFilesDir(null), "aura-ai-update.apk")
                 c.inputStream.use { src -> apk.outputStream().use { dst -> src.copyTo(dst) } }; c.disconnect()
                 runOnUiThread {
                     if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
                         AlertDialog.Builder(this).setTitle("Yükleme izni gerekli")
-                            .setMessage("Android ayarlarından JARVİS AI için bu kaynaktan uygulama yükleme iznini aç.")
+                            .setMessage("Android ayarlarından Aura AI AI için bu kaynaktan uygulama yükleme iznini aç.")
                             .setPositiveButton("Ayarları aç") { _, _ -> startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))) }
                             .setNegativeButton("İptal", null).show()
                     } else {
@@ -440,13 +441,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun settings() {
-        AlertDialog.Builder(this).setTitle("JARVİS AI · Ayarlar")
+        AlertDialog.Builder(this).setTitle("Aura AI AI · Ayarlar")
             .setItems(arrayOf("Sohbet geçmişini temizle", "Güncellemeleri kontrol et", "GitHub sürümleri")) { _, i ->
                 when (i) {
                     0 -> AlertDialog.Builder(this).setTitle("Geçmiş silinsin mi?").setMessage("Bu cihazdaki sohbet geçmişi silinecek.")
                         .setNegativeButton("Vazgeç", null).setPositiveButton("Temizle") { _, _ ->
                             prefs.edit().remove("history").apply(); messages.removeAllViews()
-                            bubble("JARVİS", "Sohbet geçmişi temizlendi.", false, false)
+                            bubble("AURA AI", "Sohbet geçmişi temizlendi.", false, false)
                         }.show()
                     1 -> checkUpdates(false)
                     2 -> startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releasesPage)))
@@ -461,7 +462,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         try {
             startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR"); putExtra(RecognizerIntent.EXTRA_PROMPT, "JARVİS'e Türkçe konuş")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR"); putExtra(RecognizerIntent.EXTRA_PROMPT, "Aura AI'e Türkçe konuş")
             }, 73)
         } catch (_: Exception) { Toast.makeText(this, "Bu cihazda konuşma tanıma desteklenmiyor.", Toast.LENGTH_LONG).show() }
     }
@@ -474,7 +475,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun makeNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(channelId, "JARVİS AI bildirimleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(channelId, "Aura AI AI bildirimleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Model durumu ve uygulama güncellemeleri"
             })
     }
@@ -514,6 +515,39 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         cornerRadius = dp(radius).toFloat(); setStroke(dp(1), Color.rgb(91, 65, 130))
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
+    /** Aura artwork is drawn locally with Canvas; no emoji fonts or network image required. */
+    private inner class AuraOrbView(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val cx = width / 2f
+            val cy = height / 2f
+            val radius = minOf(width, height) * 0.39f
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = dp(1).toFloat()
+            paint.color = Color.argb(130, 207, 164, 255)
+            canvas.drawCircle(cx, cy, radius * 1.22f, paint)
+            paint.color = Color.argb(90, 119, 226, 255)
+            canvas.drawCircle(cx, cy, radius * 1.42f, paint)
+            paint.style = Paint.Style.FILL
+            paint.shader = RadialGradient(cx - radius * 0.25f, cy - radius * 0.32f, radius * 1.5f,
+                intArrayOf(Color.rgb(240, 220, 255), Color.rgb(165, 94, 255), Color.rgb(62, 38, 135), Color.rgb(20, 16, 38)),
+                floatArrayOf(0f, 0.34f, 0.72f, 1f), Shader.TileMode.CLAMP)
+            canvas.drawCircle(cx, cy, radius, paint)
+            paint.shader = null
+            paint.style = Paint.Style.STROKE
+            paint.color = Color.argb(210, 222, 197, 255)
+            canvas.drawArc(cx - radius * 0.72f, cy - radius * 0.42f, cx + radius * 0.72f, cy + radius * 0.62f, 205f, 235f, false, paint)
+            paint.style = Paint.Style.FILL
+            paint.color = Color.WHITE
+            canvas.drawCircle(cx - radius * 0.27f, cy - radius * 0.35f, radius * 0.09f, paint)
+            paint.color = Color.argb(190, 119, 226, 255)
+            canvas.drawCircle(cx + radius * 0.54f, cy - radius * 0.18f, radius * 0.045f, paint)
+        }
+    }
+
+
 
     override fun onInit(code: Int) {
         if (code == TextToSpeech.SUCCESS) {
