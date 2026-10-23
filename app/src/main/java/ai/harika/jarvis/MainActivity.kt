@@ -75,7 +75,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             background = gradient(intArrayOf(Color.rgb(150, 79, 241), Color.rgb(57, 39, 119)), 18)
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         val brand = LinearLayout(this).apply { orientation = 1; setPadding(dp(12), 0, 0, 0) }
-        brand.addView(label("Aura AI AI", 22f, Color.WHITE, true))
+        brand.addView(label("Aura AI", 22f, Color.WHITE, true))
         brand.addView(label("KİŞİSEL YAPAY ZEKÂ", 10f, cyan, true))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(button("⚙", false) { settings() })
@@ -197,7 +197,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         return when {
             q.contains("selam") || q.contains("merhaba") || q.contains("salam") || q == "hey" -> "Selam! 💜 Ben Aura AI. Şu an hafif çevrimdışı moddayım. Daha doğal cevaplar için ücretsiz yerel modeli indirmen gerekiyor."
             q.contains("nasılsın") || q.contains("ne haber") -> "İyiyim, buradayım ve çalışıyorum! Model yüklü olmadığı için şu an sınırlı cevap verebiliyorum."
-            q.contains("adın") || q.contains("kimsin") -> "Ben Aura AI AI, cihazında çalışması için tasarlanan kişisel asistanım."
+            q.contains("adın") || q.contains("kimsin") -> "Ben Aura AI, cihazında çalışması için tasarlanan kişisel asistanım."
             q.contains("yardım") || q.contains("ne yap") -> "Şu an hafif modda selamlaşma ve temel yönlendirme yapabiliyorum. Daha doğal sohbet için alttaki ücretsiz yerel modeli indir."
             q.contains("saat") || q.contains("tarih") -> "Cihazındaki tarih ve saat: " + java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("tr", "TR")).format(java.util.Date()) + "."
             q.contains("model") || q.contains("indir") -> "Tam sohbet motoru için yaklaşık 586 MB'lık Qwen yerel modelini indirmen gerekiyor."
@@ -285,9 +285,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun updateDialog(version: String, notes: String, apk: String) {
-        notifyUser("Yeni güncelleme geldi", "Aura AI AI $version sürümü hazır.")
+        notifyUser("Yeni güncelleme geldi", "Aura AI $version sürümü hazır.")
         AlertDialog.Builder(this).setTitle("✦ Yeni güncelleme geldi")
-            .setMessage("Aura AI AI $version\n\n" + notes.take(700) + "\n\nGüncellemeyi indirip Android yükleme ekranını açalım mı?")
+            .setMessage("Aura AI $version\n\n" + notes.take(700) + "\n\nGüncellemeyi indirip Android yükleme ekranını açalım mı?")
             .setNegativeButton("Daha sonra", null)
             .setPositiveButton("Güncellemeyi indir") { _, _ -> downloadUpdate(apk) }.show()
     }
@@ -304,7 +304,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 runOnUiThread {
                     if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
                         AlertDialog.Builder(this).setTitle("Yükleme izni gerekli")
-                            .setMessage("Android ayarlarından Aura AI AI için bu kaynaktan uygulama yükleme iznini aç.")
+                            .setMessage("Android ayarlarından Aura AI için bu kaynaktan uygulama yükleme iznini aç.")
                             .setPositiveButton("Ayarları aç") { _, _ -> startActivity(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))) }
                             .setNegativeButton("İptal", null).show()
                     } else {
@@ -318,7 +318,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun settings() {
-        AlertDialog.Builder(this).setTitle("Aura AI AI · Ayarlar")
+        AlertDialog.Builder(this).setTitle("Aura AI · Ayarlar")
             .setItems(arrayOf("Sohbet geçmişini temizle", "Güncellemeleri kontrol et", "GitHub sürümleri")) { _, i ->
                 when (i) {
                     0 -> AlertDialog.Builder(this).setTitle("Geçmiş silinsin mi?").setMessage("Bu cihazdaki sohbet geçmişi silinecek.")
@@ -352,7 +352,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun makeNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(channelId, "Aura AI AI bildirimleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(channelId, "Aura AI bildirimleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Model durumu ve uygulama güncellemeleri"
             })
     }
