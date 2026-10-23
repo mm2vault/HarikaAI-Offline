@@ -1,19 +1,31 @@
-# JARVİS AI
+# Aura AI
 
 Ücretsiz, Türkçe odaklı Android asistanı. Kotlin ile geliştirilir; yerel yapay zekâ modeli APK içine gömülmez, uygulama içinde indirilir.
 
 ## Özellikler
-- Siyah/mor neon arayüz
+- Siyah/mor neon arayüz ve yerel çizilmiş Aura orb'u
 - LiteRT-LM ile cihaz içi Qwen3-0.6B
 - Türkçe konuşma tanıma ve sesli yanıt (Android cihaz desteğine bağlı)
 - Sohbet geçmişini cihazda saklama
-- Tarayıcıda internet araması
-- GitHub Actions ile debug APK derleme
+- Kullanıcı açıkça istediğinde web araması
+- GitHub Releases üzerinden APK sürüm kontrolü
+- GitHub Actions ile APK derleme
 
 ## Model
 Yaklaşık 586 MB boyutlu model: https://huggingface.co/litert-community/Qwen3-0.6B
 
 ## APK derleme
-GitHub'da Actions sekmesini açıp Build JARVIS AI APK iş akışını çalıştır. Başarılı olursa jarvis-ai-debug-apk artifact'ini indir.
+GitHub'daki Actions bölümünde **Aura AI Android APK Build** iş akışını aç. Başarılı derlemenin `Aura-AI-APK` artifact'ini indir. Release indirme bağlantısı da ilgili `aura-build-N` etiketinde yayımlanır.
 
-> Bu ilk iskelettir. Gerçek cihazda derleme ve model çıkarımı doğrulanmadan üretime hazır olduğu iddia edilmez.
+## Android güncelleme imzası — önemli
+Android, mevcut uygulamanın üzerine yalnızca aynı uygulama kimliği **ve aynı imza sertifikası** ile imzalanmış APK'yi kurar. Bu nedenle her GitHub Actions çalışmasında yeniden oluşturulan debug anahtarı, önceki APK'nin üzerine güncelleme olarak kurulamayabilir.
+
+Gelecek derlemelerde sabit imza kullanmak için GitHub deposunda **Settings → Secrets and variables → Actions** bölümüne şu Actions secrets değerlerini ekle:
+- `AURA_KEYSTORE_BASE64`: sabit keystore dosyasının Base64 içeriği
+- `AURA_STORE_PASSWORD`: keystore parolası
+- `AURA_KEY_ALIAS`: anahtar takma adı
+- `AURA_KEY_PASSWORD`: anahtar parolası
+
+**Mevcut telefondaki uygulamayla aynı imza anahtarı kullanılmalıdır.** Eski anahtar elinde yoksa yeni imzalı APK eski kurulumun üzerine yüklenemez; uygulamayı kaldırmak yerel sohbet geçmişini silebilir. Önce sohbet geçmişini yedeklemeden uygulamayı kaldırma. Gizli anahtar dosyasını Git deposuna asla ekleme.
+
+> CI derlemesinin başarılı olması, gerçek telefonda kurulumun veya model çıkarımının doğrulandığı anlamına gelmez. Gerçek cihaz testi ayrıca yapılmalıdır.
