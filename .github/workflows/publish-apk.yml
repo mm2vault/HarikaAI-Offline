@@ -22,6 +22,38 @@ jobs:
     steps:
       - name: Checkout selected branch or ref
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and reject duplicate tags
+        id: version
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Version must use numeric MAJOR.MINOR.PATCH format, e.g. 0.1.1" >&2
+            exit 1
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "$RELEASE_VERSION"
+          if (( MAJOR > 999 || MINOR > 999 || PATCH > 999 )); then
+            echo "Each version part must be between 0 and 999." >&2
+            exit 1
+          fi
+          VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
+          if (( VERSION_CODE < 1 )); then
+            echo "Version 0.0.0 is not publishable." >&2
+            exit 1
+          fi
+          TAG="aura-v$RELEASE_VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag $TAG already exists; choose a new version." >&2
+            exit 1
+          fi
+          echo "name=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -34,11 +66,26 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Set release version for this build
+        shell: bash
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          sed -i -E "s/^AURA_VERSION_NAME=.*/AURA_VERSION_NAME=$VERSION_NAME/" gradle.properties
+          sed -i -E "s/^AURA_VERSION_CODE=.*/AURA_VERSION_CODE=$VERSION_CODE/" gradle.properties
+          grep -Fx "AURA_VERSION_NAME=$VERSION_NAME" gradle.properties
+          grep -Fx "AURA_VERSION_CODE=$VERSION_CODE" gradle.properties
+
       - name: Build APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK identity and visible branding
+      - name: Verify APK identity, branding, and version metadata
         shell: bash
+        env:
+          EXPECTED_VERSION_NAME: ${{ steps.version.outputs.name }}
+          EXPECTED_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
@@ -48,17 +95,22 @@ jobs:
           BADGING="$("$AAPT" dump badging "$APK")"
           echo "$BADGING" | grep -F "package: name='ai.harika.jarvis'"
           echo "$BADGING" | grep -F "application-label:'Aura AI'"
+          echo "$BADGING" | grep -F "versionName='$EXPECTED_VERSION_NAME'"
+          echo "$BADGING" | grep -F "versionCode='$EXPECTED_VERSION_CODE'"
+          echo "APK identity, branding, versionName and versionCode checks passed."
 
       - name: Publish APK as a clearly marked prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: aura-v${{ inputs.version }}
-          name: Aura AI ${{ inputs.version }} (Test)
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Aura AI ${{ steps.version.outputs.name }} (Test)
           body: |
             ${{ inputs.release_notes }}
 
             **This is a test/prerelease APK, not a stable production release.**
-            The APK is built with the debug signing configuration. Installing over an existing copy depends on signing-certificate compatibility. Test on a separate device/profile first.
+            Package ID: `ai.harika.jarvis`
+            APK versionName and versionCode were verified during the build.
+            The APK uses debug signing. Android may reject installation over an existing copy if its signing certificate differs. Do not uninstall an existing app to work around this; verify signing compatibility first.
           prerelease: true
           make_latest: false
           files: app/build/outputs/apk/debug/app-debug.apk
