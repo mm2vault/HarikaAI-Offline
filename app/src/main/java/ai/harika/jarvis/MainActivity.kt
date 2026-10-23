@@ -397,7 +397,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 val releaseList = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() })
                 c.disconnect()
 
-                // Ignore legacy releases such as "jarvis-latest". Only Aura builds with an APK count.
+                // Ignore legacy releases; only Aura builds with an APK count.
                 val candidates = (0 until releaseList.length()).mapNotNull { index ->
                     val release = releaseList.optJSONObject(index) ?: return@mapNotNull null
                     val tag = release.optString("tag_name", "")
