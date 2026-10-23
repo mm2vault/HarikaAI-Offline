@@ -41,7 +41,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val cyan = Color.rgb(119, 226, 255)
     private val modelName = "Qwen3-0.6B.litertlm"
     private val modelUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm"
-    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases/latest"
+    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases?per_page=1"
     private val releasesPage = "https://github.com/mm2vault/HarikaAI-Offline/releases"
     private val channelId = "aura_notifications"
     private lateinit var messages: LinearLayout
@@ -384,7 +384,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 c.setRequestProperty("Accept", "application/vnd.github+json")
                 c.setRequestProperty("User-Agent", "AuraAI-Android")
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val json = JSONObject(c.inputStream.bufferedReader().use { it.readText() }); c.disconnect()
+                val releaseList = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() }); c.disconnect()
+                val json = releaseList.optJSONObject(0) ?: error("Henüz yayınlanmış sürüm yok.")
                 val tag = json.optString("tag_name", "")
                 val assets = json.optJSONArray("assets")
                 var apk = ""
