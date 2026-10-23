@@ -3,7 +3,7 @@
 Ücretsiz, Türkçe/Azerice odaklı Android kişisel asistanı. Öncelik cihaz içinde çalışan yapay zekâdır; ücretli API anahtarı varsayılan olarak kullanılmaz.
 
 <p align="center">
-  <a href="https://github.com/mm2vault/HarikaAI-Offline/releases/latest">
+  <a href="https://github.com/mm2vault/HarikaAI-Offline/releases">
     <img src="https://img.shields.io/badge/⬇%20AURA%20AI-EN%20SON%20APK-8B5CF6?style=for-the-badge&logo=android&logoColor=white" alt="Aura AI en son APK'yı indir">
   </a>
 </p>
