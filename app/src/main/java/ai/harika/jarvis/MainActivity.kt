@@ -393,10 +393,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     val a = assets.optJSONObject(i) ?: continue
                     if (a.optString("name").endsWith(".apk", true)) { apk = a.optString("browser_download_url"); break }
                 }
-                val current = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
+                val packageInfo = packageManager.getPackageInfo(packageName, 0)
+                val currentCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode else packageInfo.versionCode.toLong()
+                val releaseCode = tag.substringAfterLast("-").toLongOrNull() ?: 0L
+                val current = packageInfo.versionName ?: "bilinmiyor"
                 runOnUiThread {
-                    if (tag.isNotBlank() && tag.removePrefix("v") != current && apk.isNotBlank()) updateDialog(tag, json.optString("body", "Yeni sürüm hazır."), apk)
-                    else if (!silent) info("Güncelleme kontrolü", "Yeni sürüm bulunamadı. Mevcut sürüm: $current")
+                    if (releaseCode > currentCode && apk.isNotBlank()) updateDialog(tag, json.optString("body", "Yeni sürüm hazır."), apk)
+                    else if (!silent) info("Güncelleme kontrolü", "Yeni sürüm bulunamadı. Mevcut sürüm: $current (build $currentCode)")
                 }
             } catch (e: Exception) {
                 runOnUiThread { if (!silent) info("Güncelleme kontrol edilemedi", "Uygulama güncellemesi için herkese açık GitHub Release kaynağı gerekir.\n\n" + (e.message ?: "Bağlantı hatası")) }
