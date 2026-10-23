@@ -29,10 +29,11 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
-    private val bg = Color.rgb(9, 8, 18)
-    private val panel = Color.rgb(23, 18, 38)
-    private val purple = Color.rgb(180, 108, 255)
-    private val cyan = Color.rgb(119, 226, 255)
+    private val bg = Color.rgb(8, 6, 18)
+    private val panel = Color.rgb(24, 17, 43)
+    private val purple = Color.rgb(190, 124, 255)
+    private val cyan = Color.rgb(111, 220, 255)
+    private val pink = Color.rgb(255, 105, 205)
     private val modelName = "Qwen3-0.6B.litertlm"
     private val modelUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm"
     private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases/latest"
@@ -51,8 +52,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
+        window.statusBarColor = Color.rgb(12, 7, 25)
+        window.navigationBarColor = Color.rgb(8, 6, 18)
+        if (Build.VERSION.SDK_INT >= 21) window.decorView.systemUiVisibility = 0
         tts = TextToSpeech(this, this)
         makeNotificationChannel()
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
@@ -68,38 +70,41 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildUi() {
-        val root = LinearLayout(this).apply { orientation = 1; setPadding(dp(16), dp(10), dp(16), dp(10)); setBackgroundColor(bg) }
+        val root = LinearLayout(this).apply { orientation = 1; setPadding(dp(16), dp(10), dp(16), dp(10)); setBackgroundColor(bg); alpha = 0f }
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; orientation = 0; setPadding(0, dp(4), 0, dp(14)) }
         header.addView(TextView(this).apply {
-            text = "✦"; textSize = 28f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-            background = gradient(intArrayOf(Color.rgb(150, 79, 241), Color.rgb(57, 39, 119)), 18)
+            text = "✧"; textSize = 29f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            background = gradient(intArrayOf(Color.rgb(218, 120, 255), Color.rgb(75, 74, 220), Color.rgb(39, 181, 255)), 19)
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         val brand = LinearLayout(this).apply { orientation = 1; setPadding(dp(12), 0, 0, 0) }
         brand.addView(label("Aura AI", 22f, Color.WHITE, true))
-        brand.addView(label("KİŞİSEL YAPAY ZEKÂ", 10f, cyan, true))
+        brand.addView(label("✦  YOUR AURA COMPANION", 10f, cyan, true))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(button("⚙", false) { settings() })
         root.addView(header)
 
         val hero = LinearLayout(this).apply {
-            orientation = 1; gravity = Gravity.CENTER; setPadding(dp(16), dp(17), dp(16), dp(17))
-            background = gradient(intArrayOf(Color.rgb(48, 28, 81), Color.rgb(19, 17, 34)), 24)
+            orientation = 1; gravity = Gravity.CENTER; setPadding(dp(16), dp(19), dp(16), dp(19))
+            background = gradient(intArrayOf(Color.rgb(66, 31, 105), Color.rgb(31, 20, 58), Color.rgb(16, 13, 30)), 25)
         }
         hero.addView(TextView(this).apply {
-            text = "✧"; textSize = 44f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-            background = gradient(intArrayOf(Color.rgb(198, 136, 255), Color.rgb(82, 56, 185)), 100)
+            text = "◉"; textSize = 42f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            background = gradient(intArrayOf(Color.rgb(255, 120, 218), Color.rgb(126, 78, 255), Color.rgb(55, 185, 255)), 100)
+            elevation = dp(10).toFloat()
         }, LinearLayout.LayoutParams(dp(78), dp(78)).apply { bottomMargin = dp(12) })
         hero.addView(label("Nasıl yardımcı olabilirim?", 20f, Color.WHITE, true))
         hero.addView(label("Sor, düşün, üret. Sohbetlerin cihazında kalır.", 12f, Color.rgb(194, 184, 215), false))
-        hero.addView(label("MODEL YOKSA HAFİF MOD · MODELLE TAM SOHBET", 9f, Color.rgb(190, 154, 255), true))
+        hero.addView(label("✦  OFFLINE AI  ·  PRIVATE BY DESIGN  ✦", 9f, Color.rgb(208, 170, 255), true))
         status = label("●  Model henüz yüklenmedi", 12f, Color.rgb(255, 204, 123), true)
         (status.layoutParams as? LinearLayout.LayoutParams)?.gravity = Gravity.CENTER
         hero.addView(status)
-        root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        root.addView(hero, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        hero.scaleX = 0.98f; hero.scaleY = 0.98f
+        hero.animate().scaleX(1f).scaleY(1f).setDuration(650).start()
 
         val updatePanel = LinearLayout(this).apply {
             orientation = 1; setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = rounded(panel, 17, Color.rgb(62, 49, 85))
+            background = rounded(Color.rgb(25, 19, 43), 18, Color.rgb(104, 67, 151))
         }
         val updateRow = LinearLayout(this).apply { orientation = 0; gravity = Gravity.CENTER_VERTICAL }
         updateRow.addView(label("GÜNCELLEMELER", 11f, cyan, true), LinearLayout.LayoutParams(0, -2, 1f))
@@ -119,14 +124,39 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         prompt = EditText(this).apply {
             hint = "Aura AI'e mesaj yaz…"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE); textSize = 15f
             maxLines = 4; imeOptions = EditorInfo.IME_ACTION_SEND; setPadding(dp(12), dp(9), dp(12), dp(9))
-            background = rounded(Color.rgb(31, 26, 46), 16, Color.rgb(76, 61, 100))
+            background = rounded(Color.rgb(27, 20, 45), 18, Color.rgb(112, 75, 163))
             setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_SEND) { sendMessage(); true } else false }
         }
         composer.addView(prompt, LinearLayout.LayoutParams(0, -2, 1f))
         composer.addView(button("🎙", false) { voice() })
         composer.addView(button("➤", true) { sendMessage() })
         root.addView(composer)
-        setContentView(root)
+        val stage = FrameLayout(this)
+        stage.setBackgroundColor(bg)
+        stage.addView(root, FrameLayout.LayoutParams(-1, -1))
+        val splash = LinearLayout(this).apply {
+            orientation = 1; gravity = Gravity.CENTER; setPadding(dp(28), dp(28), dp(28), dp(28))
+            background = gradient(intArrayOf(Color.rgb(15, 8, 31), Color.rgb(40, 17, 68), Color.rgb(8, 6, 18)), 0)
+        }
+        val mascot = TextView(this).apply {
+            text = "◉"; textSize = 68f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            background = gradient(intArrayOf(Color.rgb(255, 111, 218), Color.rgb(135, 77, 255), Color.rgb(53, 190, 255)), 100)
+            elevation = dp(18).toFloat()
+        }
+        splash.addView(mascot, LinearLayout.LayoutParams(dp(112), dp(112)).apply { bottomMargin = dp(22) })
+        splash.addView(label("Aura AI", 34f, Color.WHITE, true))
+        splash.addView(label("YOUR OWN LITTLE UNIVERSE", 11f, cyan, true).apply { setPadding(0, dp(8), 0, 0) })
+        val shimmer = label("✦  ✧  ✦", 19f, purple, true).apply { setPadding(0, dp(26), 0, 0) }
+        splash.addView(shimmer)
+        stage.addView(splash, FrameLayout.LayoutParams(-1, -1))
+        setContentView(stage)
+        mascot.animate().rotationBy(12f).scaleX(1.06f).scaleY(1.06f).setDuration(700).withEndAction {
+            mascot.animate().rotationBy(-12f).scaleX(1f).scaleY(1f).setDuration(700).start()
+        }.start()
+        splash.postDelayed({
+            root.animate().alpha(1f).setDuration(450).start()
+            splash.animate().alpha(0f).setDuration(400).withEndAction { stage.removeView(splash) }.start()
+        }, 1050)
     }
 
     private fun restoreChat() {
