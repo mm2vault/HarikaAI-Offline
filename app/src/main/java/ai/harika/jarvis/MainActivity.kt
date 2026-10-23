@@ -159,7 +159,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         status.text = "Yanıt hazırlanıyor…"
         thread {
             try {
-                val answer = conv.sendMessage(prompt)
+                val answer = conv.sendMessage(prompt).toString()
                 runOnUiThread {
                     append("JARVİS: " + answer)
                     status.text = "Yerel yapay zekâ hazır"
