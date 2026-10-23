@@ -1,4 +1,4 @@
-name: Build JARVIS AI APK
+name: Build Aura AI APK
 on:
   workflow_dispatch:
   push:
@@ -22,10 +22,10 @@ jobs:
       - name: Publish direct APK download
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: jarvis-latest
-          name: JARVIS AI — Latest APK
+          tag_name: aura-latest
+          name: Aura AI — Latest APK
           target_commitish: main
           make_latest: true
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: app/build/outputs/apk/debug/Aura-AI.apk
           overwrite_files: true
           fail_on_unmatched_files: true
