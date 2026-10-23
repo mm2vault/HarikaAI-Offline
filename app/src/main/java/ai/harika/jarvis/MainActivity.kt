@@ -73,19 +73,21 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val root = LinearLayout(this).apply { orientation = 1; setPadding(dp(16), dp(10), dp(16), dp(10)); setBackgroundColor(bg) }
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; orientation = 0; setPadding(0, dp(4), 0, dp(14)) }
         header.addView(TextView(this).apply {
-            text = "✦"; textSize = 28f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            text = "✦"; textSize = 30f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+            elevation = dp(4).toFloat()
             background = gradient(intArrayOf(Color.rgb(150, 79, 241), Color.rgb(57, 39, 119)), 18)
         }, LinearLayout.LayoutParams(dp(52), dp(52)))
         val brand = LinearLayout(this).apply { orientation = 1; setPadding(dp(12), 0, 0, 0) }
-        brand.addView(label("JARVİS AI", 22f, Color.WHITE, true))
-        brand.addView(label("KİŞİSEL YAPAY ZEKÂ", 10f, cyan, true))
+        brand.addView(label("Aura AI", 23f, Color.WHITE, true))
+        brand.addView(label("KİŞİSEL YAPAY ZEKÂ · BETA", 10f, cyan, true))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(button("⚙", false) { settings() })
         root.addView(header)
 
         val hero = LinearLayout(this).apply {
             orientation = 1; gravity = Gravity.CENTER; setPadding(dp(16), dp(17), dp(16), dp(17))
-            background = gradient(intArrayOf(Color.rgb(48, 28, 81), Color.rgb(19, 17, 34)), 24)
+            background = gradient(intArrayOf(Color.rgb(58, 34, 98), Color.rgb(20, 17, 37)), 24)
+            elevation = dp(2).toFloat()
         }
         hero.addView(TextView(this).apply {
             text = "✧"; textSize = 44f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
@@ -110,6 +112,29 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         updatePanel.addView(label("Yeni sürüm varsa burada haber verilir.", 12f, Color.LTGRAY, false))
         root.addView(updatePanel, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
+        // Quick actions are lightweight native views; no extra library is needed.
+        val quickScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val quickRow = LinearLayout(this).apply {
+            orientation = 0
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(8))
+        }
+        listOf("💡 Fikir üret", "💻 Kod yaz", "🔎 Webde ara: AI haberleri").forEach { suggestion ->
+            val chip = button(suggestion, false) {
+                if (suggestion.startsWith("🔎")) {
+                    prompt.setText("Webde ara: AI haberleri")
+                    sendMessage()
+                } else {
+                    prompt.setText(if (suggestion.contains("Kod")) "Bana bir kod örneği hazırla" else "Bana yaratıcı fikirler öner")
+                    prompt.setSelection(prompt.text.length)
+                    prompt.requestFocus()
+                }
+            }
+            quickRow.addView(chip, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(8) })
+        }
+        quickScroll.addView(quickRow)
+        root.addView(quickScroll, LinearLayout.LayoutParams(-1, -2))
+
         scroll = ScrollView(this).apply { isFillViewport = true }
         messages = LinearLayout(this).apply { orientation = 1 }
         scroll.addView(messages)
@@ -119,7 +144,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8); bottomMargin = dp(8) })
         val composer = LinearLayout(this).apply { orientation = 0; gravity = Gravity.CENTER_VERTICAL }
         prompt = EditText(this).apply {
-            hint = "JARVİS'e mesaj yaz…"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE); textSize = 15f
+            hint = "Aura AI’ye mesaj yaz…"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE); textSize = 15f
             maxLines = 4; imeOptions = EditorInfo.IME_ACTION_SEND; setPadding(dp(12), dp(9), dp(12), dp(9))
             background = rounded(Color.rgb(31, 26, 46), 16, Color.rgb(76, 61, 100))
             setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_SEND) { sendMessage(); true } else false }
@@ -183,8 +208,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun bubble(who: String, text: String, user: Boolean, save: Boolean) {
         val card = LinearLayout(this).apply {
-            orientation = 1; setPadding(dp(13), dp(10), dp(13), dp(10))
-            background = rounded(if (user) Color.rgb(62, 40, 96) else panel, 17, if (user) Color.rgb(108, 73, 153) else Color.rgb(52, 43, 72))
+            orientation = 1; setPadding(dp(14), dp(11), dp(14), dp(11))
+            background = rounded(if (user) Color.rgb(66, 42, 105) else Color.rgb(25, 20, 41), 18, if (user) Color.rgb(132, 91, 181) else Color.rgb(65, 50, 91))
+            elevation = dp(1).toFloat()
             layoutParams = LinearLayout.LayoutParams(if (user) (resources.displayMetrics.widthPixels * .78f).toInt() else -1, -2).apply {
                 gravity = if (user) Gravity.END else Gravity.START; bottomMargin = dp(8)
             }
