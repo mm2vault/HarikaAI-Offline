@@ -13,7 +13,7 @@ val hasReleaseSigning = !signingStoreFile.isNullOrBlank() &&
     !signingKeyPassword.isNullOrBlank()
 
 android {
-    namespace = "ai.harika.jarvis"
+    namespace = "ai.harika.aura"
     compileSdk = 35
     defaultConfig {
         applicationId = "ai.harika.jarvis"
