@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.text.util.Linkify
+import android.text.method.LinkMovementMethod
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
@@ -150,7 +151,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         card.addView(label(who.uppercase(Locale.ROOT), 10f, if (user) cyan else purple, true))
         card.addView(label(text, 15f, Color.rgb(244, 241, 250), false).apply {
             setPadding(0, dp(4), 0, 0)
-            autoLinkMask = Linkify.WEB_URLS
+            Linkify.addLinks(this, Linkify.WEB_URLS)
+            movementMethod = LinkMovementMethod.getInstance()
             linksClickable = true
             setLinkTextColor(cyan)
         })
@@ -239,8 +241,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         )
         for (pattern in patterns) {
             val match = pattern.matchEntire(clean) ?: continue
-            val query = if (pattern.pattern.startsWith("(?i)^(")) match.groupValues[1] else match.groupValues[1]
-            if (query.isNotBlank()) return query.trim()
+            val query = match.groupValues[1].trim()
+            if (query.isNotEmpty()) return query
         }
         return null
     }
