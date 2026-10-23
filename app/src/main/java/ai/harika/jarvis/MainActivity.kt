@@ -76,11 +76,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun buildUi() {
         val root = LinearLayout(this).apply { orientation = 1; setPadding(dp(16), dp(10), dp(16), dp(10)); setBackgroundColor(bg) }
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; orientation = 0; setPadding(0, dp(4), 0, dp(14)) }
-        header.addView(TextView(this).apply {
-            text = ""; contentDescription = "Aura AI"; textSize = 30f; gravity = Gravity.CENTER; setTextColor(Color.WHITE)
-            elevation = dp(4).toFloat()
-            background = gradient(intArrayOf(Color.rgb(150, 79, 241), Color.rgb(57, 39, 119)), 18)
-        }, LinearLayout.LayoutParams(dp(52), dp(52)))
+        header.addView(AuraOrbView(this), LinearLayout.LayoutParams(dp(52), dp(52)))
         val brand = LinearLayout(this).apply { orientation = 1; setPadding(dp(12), 0, 0, 0) }
         brand.addView(label("Aura AI", 23f, Color.WHITE, true))
         brand.addView(label("KİŞİSEL YAPAY ZEKÂ", 10f, cyan, true))
@@ -96,7 +92,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         hero.addView(AuraOrbView(this), LinearLayout.LayoutParams(dp(104), dp(104)).apply { bottomMargin = dp(12) })
         hero.addView(label("Nasıl yardımcı olabilirim?", 20f, Color.WHITE, true))
         hero.addView(label("Düşüncelerini keşfet. Fikirlerini gerçeğe dönüştür.", 12f, Color.rgb(194, 184, 215), false))
-        hero.addView(label("MODEL YOKSA HAFİF MOD · MODELLE TAM SOHBET", 9f, Color.rgb(190, 154, 255), true))
+        hero.addView(label("YEREL MODEL · GİZLİLİK ODAKLI SOHBET", 9f, Color.rgb(190, 154, 255), true))
         status = label("Model henüz yüklenmedi", 12f, Color.rgb(255, 204, 123), true)
         (status.layoutParams as? LinearLayout.LayoutParams)?.gravity = Gravity.CENTER
         hero.addView(status)
@@ -475,7 +471,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun makeNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(channelId, "Aura AI AI bildirimleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            NotificationChannel(channelId, "Aura AI bildirimleri", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Model durumu ve uygulama güncellemeleri"
             })
     }
