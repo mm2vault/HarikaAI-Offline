@@ -359,7 +359,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun notifyUser(title: String, body: String) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val n = NotificationCompat.Builder(this, channelId).setSmallIcon(R.drawable.ic_jarvis)
+        val n = NotificationCompat.Builder(this, channelId).setSmallIcon(R.drawable.ic_aura)
             .setContentTitle(title).setContentText(body).setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
         getSystemService(NotificationManager::class.java).notify((title + body).hashCode(), n)
