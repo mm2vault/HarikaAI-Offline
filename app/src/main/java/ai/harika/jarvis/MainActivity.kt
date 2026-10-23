@@ -175,7 +175,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         } catch (_: Exception) {
             // Continue below and migrate the old history representation.
         }
-        saved.split("\\n--J--\\n").forEach { row ->
+        saved.split("\\n--J--\\n", "\n--J--\n").forEach { row ->
             val i = row.indexOf("::")
             if (i > 0) entries.add(ChatEntry(row.substring(0, i), row.substring(i + 2)))
         }
@@ -427,7 +427,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 }
             } catch (e: Exception) {
                 runOnUiThread {
-                    if (!silent) info("Güncelleme kontrol edilemedi", "GitHub Release kaynağına ulaşılamadı.\\n\\n" + (e.message ?: "Bağlantı hatası"))
+                    if (!silent) info("Güncelleme kontrol edilemedi", "GitHub Release kaynağına ulaşılamadı.\n\n" + (e.message ?: "Bağlantı hatası"))
                 }
             }
         }
