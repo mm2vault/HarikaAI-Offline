@@ -25,6 +25,18 @@ jobs:
           gradle-version: '8.9'
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
+      - name: Verify APK identity and visible branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -n "$AAPT"
+          BADGING="$("$AAPT" dump badging "$APK")"
+          echo "$BADGING" | grep -F "package: name='ai.harika.jarvis'"
+          echo "$BADGING" | grep -F "application-label:'Aura AI'"
+          echo "APK exists and package identity / app label checks passed."
       - name: Upload test APK (not a release)
         uses: actions/upload-artifact@v4
         with:
