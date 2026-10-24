@@ -245,7 +245,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     val part = File(filesDir, "$modelName.part")
                     val c = URL(modelUrl).openConnection() as HttpURLConnection
                     c.connectTimeout = 20000; c.readTimeout = 90000; c.instanceFollowRedirects = true
-                    if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
+                    if (c.responseCode !in 200..299) error("GitHub sürüm API hatası (HTTP ${c.responseCode}). Release bilgisi okunamadı.")
                     val total = c.contentLengthLong
                     c.inputStream.use { src -> part.outputStream().use { dst ->
                         val buf = ByteArray(65536); var count = 0L
@@ -321,7 +321,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 var newestParts: List<Int>? = null
                 for (i in 0 until releases.length()) {
                     val release = releases.optJSONObject(i) ?: continue
-                    if (release.optBoolean("draft", false) || release.optBoolean("prerelease", false)) continue
+                    if (release.optBoolean("draft", false)) continue // Public test prereleases also carry APK updates.
                     val tag = release.optString("tag_name", "")
                     val parts = versionParts(tag) ?: continue
                     val assets = release.optJSONArray("assets") ?: continue
