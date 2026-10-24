@@ -381,8 +381,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 val c = URL(url).openConnection() as HttpURLConnection
                 c.connectTimeout = 15000; c.readTimeout = 90000; c.instanceFollowRedirects = true
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val apk = File(getExternalFilesDir(null), "aura-ai-update.apk")
-                c.inputStream.use { src -> apk.outputStream().use { dst -> src.copyTo(dst) } }; c.disconnect()
+                val dir = getExternalFilesDir(null) ?: filesDir
+                val apk = File(dir, "aura-ai-update.apk")
+                val temp = File(dir, "aura-ai-update.apk.part")
+                try {
+                    c.inputStream.use { src -> temp.outputStream().use { dst -> src.copyTo(dst) } }
+                } finally {
+                    c.disconnect()
+                }
+                if (!temp.isFile || temp.length() < 1_000_000L) error("İndirilen APK eksik veya geçersiz.")
+                if (!temp.renameTo(apk)) error("İndirilen APK dosyası kaydedilemedi.")
+                verifyUpdateApk(apk)
                 runOnUiThread {
                     if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
                         AlertDialog.Builder(this).setTitle("Yükleme izni gerekli")
@@ -396,6 +405,41 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     }
                 }
             } catch (e: Exception) { runOnUiThread { info("Güncelleme hatası", e.message ?: "İndirme başarısız") } }
+        }
+    }
+
+    /**
+     * Check the downloaded APK before opening Android's installer.
+     * A same-package APK signed with a different certificate cannot update the installed app.
+     */
+    @Suppress("DEPRECATION")
+    private fun verifyUpdateApk(apk: File) {
+        val flags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        val candidate = packageManager.getPackageArchiveInfo(apk.absolutePath, flags)
+            ?: error("İndirilen dosya geçerli bir Android APK'sı değil.")
+        if (candidate.packageName != packageName) {
+            error("Güvenlik kontrolü: APK paket kimliği mevcut Aura AI uygulamasıyla eşleşmiyor.")
+        }
+        val installed = packageManager.getPackageInfo(packageName, flags)
+        val sameSigner = if (Build.VERSION.SDK_INT >= 28) {
+            val installedSigners = installed.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            val candidateSigners = candidate.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            installedSigners.isNotEmpty() && installedSigners == candidateSigners
+        } else {
+            val installedSigners = installed.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+            val candidateSigners = candidate.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+            installedSigners.isNotEmpty() && installedSigners == candidateSigners
+        }
+        if (!sameSigner) {
+            error("Güvenlik kontrolü: APK imzası kurulu Aura AI ile eşleşmiyor. Uygulamayı kaldırma; doğru imzalı sürüm gerekli.")
+        }
+        val installedVersion = packageManager.getPackageInfo(packageName, 0).longVersionCode
+        if (candidate.longVersionCode <= installedVersion) {
+            error("İndirilen APK sürüm kodu kurulu sürümden yeni değil.")
         }
     }
 
