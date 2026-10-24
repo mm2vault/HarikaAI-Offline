@@ -10,8 +10,10 @@ on:
       - '.github/workflows/android-search-build.yml'
       - 'README.md'
   workflow_dispatch:
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,48 +24,104 @@ jobs:
       AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Require persistent signing key
+
+      - name: Check whether persistent release signing is configured
+        id: signing
+        shell: bash
         run: |
-          test -n "$AURA_KEYSTORE_BASE64" || (echo "Missing GitHub secret AURA_KEYSTORE_BASE64" && exit 1)
-          test -n "$AURA_STORE_PASSWORD" || (echo "Missing GitHub secret AURA_STORE_PASSWORD" && exit 1)
-          test -n "$AURA_KEY_ALIAS" || (echo "Missing GitHub secret AURA_KEY_ALIAS" && exit 1)
-          test -n "$AURA_KEY_PASSWORD" || (echo "Missing GitHub secret AURA_KEY_PASSWORD" && exit 1)
-      - name: Decode stable signing key
+          set -euo pipefail
+          if [[ -n "${AURA_KEYSTORE_BASE64:-}" &&
+                -n "${AURA_STORE_PASSWORD:-}" &&
+                -n "${AURA_KEY_ALIAS:-}" &&
+                -n "${AURA_KEY_PASSWORD:-}" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Persistent signing secrets are configured."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release signing secrets are incomplete. Building a debug test APK only; no GitHub release will be published."
+          fi
+
+      - name: Decode persistent signing key
+        if: steps.signing.outputs.ready == 'true'
+        shell: bash
         run: |
-          echo "$AURA_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aura-release.jks"
+          set -euo pipefail
+          printf '%s' "$AURA_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aura-release.jks"
           test -s "$RUNNER_TEMP/aura-release.jks"
           echo "AURA_STORE_FILE=$RUNNER_TEMP/aura-release.jks" >> "$GITHUB_ENV"
+
       - name: Build signed release APK
+        if: steps.signing.outputs.ready == 'true'
         run: gradle --no-daemon -PbuildNumber=${{ github.run_number }} assembleRelease
-      - name: Prepare and verify Aura APK
+
+      - name: Verify release APK signature
+        if: steps.signing.outputs.ready == 'true'
+        shell: bash
         run: |
-          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/Aura-AI.apk
-          apksigner verify --print-certs app/build/outputs/apk/Aura-AI.apk
-          echo "APK_KIND=stable-signed-release" >> "$GITHUB_ENV"
-      - name: Upload APK artifact
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          apksigner verify --verbose --print-certs "$APK"
+          mkdir -p app/build/outputs/apk
+          cp "$APK" app/build/outputs/apk/Aura-AI.apk
+
+      - name: Build debug test APK when release signing is unavailable
+        if: steps.signing.outputs.ready != 'true'
+        run: gradle --no-daemon assembleDebug
+
+      - name: Prepare clearly labeled unsigned-for-release test artifact
+        if: steps.signing.outputs.ready != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p app/build/outputs/apk
+          cp "$APK" app/build/outputs/apk/Aura-AI-DEBUG-TEST-ONLY.apk
+
+      - name: Upload debug test artifact (not a release)
+        if: steps.signing.outputs.ready != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aura-AI-DEBUG-TEST-ONLY
+          path: app/build/outputs/apk/Aura-AI-DEBUG-TEST-ONLY.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload signed APK artifact
+        if: steps.signing.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Aura-AI-APK
           path: app/build/outputs/apk/Aura-AI.apk
           if-no-files-found: error
           retention-days: 7
-      - name: Publish direct APK download
+
+      - name: Publish signed APK release
+        if: steps.signing.outputs.ready == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: aura-build-${{ github.run_number }}
-          name: Aura AI APK build ${{ github.run_number }}
+          name: Aura AI signed APK build ${{ github.run_number }}
           body: |
-            Automated APK build from the development branch.
-            Signing mode: persistent release key required; debug fallback is disabled.
-            Not merged into main.
+            Signed APK built from the development branch.
+            Package ID: ai.harika.jarvis
+            The workflow verifies the APK signature before publishing.
+            This is a development prerelease, not a stable release.
+            Install over an existing app only after verifying that its signing certificate matches.
           prerelease: true
+          make_latest: false
           files: app/build/outputs/apk/Aura-AI.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
