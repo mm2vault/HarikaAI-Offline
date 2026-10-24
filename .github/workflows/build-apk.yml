@@ -3,6 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - brain/aura-rebuild-clean
 
 permissions:
@@ -36,7 +37,11 @@ jobs:
           BADGING="$("$AAPT" dump badging "$APK")"
           echo "$BADGING" | grep -F "package: name='ai.harika.jarvis'"
           echo "$BADGING" | grep -F "application-label:'Aura AI'"
-          echo "APK exists and package identity / app label checks passed."
+          EXPECTED_VERSION_NAME="$(grep '^AURA_VERSION_NAME=' gradle.properties | cut -d= -f2-)"
+          EXPECTED_VERSION_CODE="$(grep '^AURA_VERSION_CODE=' gradle.properties | cut -d= -f2-)"
+          echo "$BADGING" | grep -F "versionName='$EXPECTED_VERSION_NAME'"
+          echo "$BADGING" | grep -F "versionCode='$EXPECTED_VERSION_CODE'"
+          echo "APK package, app label, versionName and versionCode checks passed."
       - name: Upload test APK (not a release)
         uses: actions/upload-artifact@v4
         with:
