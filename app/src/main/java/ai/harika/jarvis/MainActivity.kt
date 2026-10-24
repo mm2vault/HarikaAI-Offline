@@ -36,7 +36,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val pink = Color.rgb(255, 105, 205)
     private val modelName = "Qwen3-0.6B.litertlm"
     private val modelUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm"
-    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases/latest"
+    private val releasesApi = "https://api.github.com/repos/mm2vault/HarikaAI-Offline/releases?per_page=50"
     private val releasesPage = "https://github.com/mm2vault/HarikaAI-Offline/releases"
     private val channelId = "aura_notifications"
     private lateinit var messages: LinearLayout
@@ -291,25 +291,77 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         thread {
             try {
                 val c = URL(releasesApi).openConnection() as HttpURLConnection
-                c.connectTimeout = 8000; c.readTimeout = 8000
+                c.connectTimeout = 10000
+                c.readTimeout = 10000
                 c.setRequestProperty("Accept", "application/vnd.github+json")
                 c.setRequestProperty("User-Agent", "AuraAI-Android")
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val json = JSONObject(c.inputStream.bufferedReader().use { it.readText() }); c.disconnect()
-                val tag = json.optString("tag_name", "")
-                val assets = json.optJSONArray("assets")
-                var apk = ""
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val a = assets.optJSONObject(i) ?: continue
-                    if (a.optString("name").endsWith(".apk", true)) { apk = a.optString("browser_download_url"); break }
+                val releases = org.json.JSONArray(c.inputStream.bufferedReader().use { it.readText() })
+                c.disconnect()
+
+                fun versionParts(value: String): List<Int>? {
+                    val match = Regex("^aura-v(\\d+)\\.(\\d+)\\.(\\d+)$").matchEntire(value) ?: return null
+                    return match.groupValues.drop(1).map { it.toIntOrNull() ?: return null }
                 }
-                val current = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
+                fun compareVersions(a: List<Int>, b: List<Int>): Int {
+                    for (i in 0..2) {
+                        if (a[i] != b[i]) return a[i].compareTo(b[i])
+                    }
+                    return 0
+                }
+
+                val installed = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
+                val installedParts = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)$")
+                    .matchEntire(installed)?.groupValues?.drop(1)?.map { it.toInt() }
+                if (installedParts == null) error("Yüklü sürüm numarası MAJOR.MINOR.PATCH biçiminde değil: $installed")
+
+                var newestTag = ""
+                var newestNotes = ""
+                var newestApk = ""
+                var newestParts: List<Int>? = null
+                for (i in 0 until releases.length()) {
+                    val release = releases.optJSONObject(i) ?: continue
+                    if (release.optBoolean("draft", false) || release.optBoolean("prerelease", false)) continue
+                    val tag = release.optString("tag_name", "")
+                    val parts = versionParts(tag) ?: continue
+                    val assets = release.optJSONArray("assets") ?: continue
+                    var apkUrl = ""
+                    for (j in 0 until assets.length()) {
+                        val asset = assets.optJSONObject(j) ?: continue
+                        val name = asset.optString("name", "")
+                        val url = asset.optString("browser_download_url", "")
+                        if (name.endsWith(".apk", true) && url.startsWith("https://github.com/")) {
+                            apkUrl = url
+                            break
+                        }
+                    }
+                    if (apkUrl.isBlank()) continue
+                    if (newestParts == null || compareVersions(parts, newestParts!!) > 0) {
+                        newestTag = tag
+                        newestNotes = release.optString("body", "Yeni sürüm hazır.")
+                        newestApk = apkUrl
+                        newestParts = parts
+                    }
+                }
+
                 runOnUiThread {
-                    if (tag.isNotBlank() && tag.removePrefix("v") != current && apk.isNotBlank()) updateDialog(tag, json.optString("body", "Yeni sürüm hazır."), apk)
-                    else if (!silent) info("Güncelleme kontrolü", "Yeni sürüm bulunamadı. Mevcut sürüm: $current")
+                    val available = newestParts
+                    if (available != null && compareVersions(available, installedParts) > 0) {
+                        updateDialog(newestTag, newestNotes, newestApk)
+                    } else if (!silent) {
+                        val message = if (available == null) {
+                            "Henüz aura-vMAJOR.MINOR.PATCH biçiminde kararlı bir APK yayımlanmamış.\n\nMevcut sürüm: $installed"
+                        } else {
+                            "Aura AI güncel.\nMevcut sürüm: $installed\nEn yeni yayımlanan sürüm: $newestTag"
+                        }
+                        info("Güncelleme kontrolü", message)
+                    }
                 }
             } catch (e: Exception) {
-                runOnUiThread { if (!silent) info("Güncelleme kontrol edilemedi", "Uygulama güncellemesi için herkese açık GitHub Release kaynağı gerekir.\n\n" + (e.message ?: "Bağlantı hatası")) }
+                runOnUiThread {
+                    if (!silent) info("Güncelleme kontrol edilemedi",
+                        "GitHub sürüm bilgisi okunamadı. İnternet bağlantını kontrol et.\n\n" + (e.message ?: "Bağlantı hatası"))
+                }
             }
         }
     }
@@ -329,8 +381,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 val c = URL(url).openConnection() as HttpURLConnection
                 c.connectTimeout = 15000; c.readTimeout = 90000; c.instanceFollowRedirects = true
                 if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
-                val apk = File(getExternalFilesDir(null), "aura-ai-update.apk")
-                c.inputStream.use { src -> apk.outputStream().use { dst -> src.copyTo(dst) } }; c.disconnect()
+                val dir = getExternalFilesDir(null) ?: filesDir
+                val apk = File(dir, "aura-ai-update.apk")
+                val temp = File(dir, "aura-ai-update.apk.part")
+                try {
+                    c.inputStream.use { src -> temp.outputStream().use { dst -> src.copyTo(dst) } }
+                } finally {
+                    c.disconnect()
+                }
+                if (!temp.isFile || temp.length() < 1_000_000L) error("İndirilen APK eksik veya geçersiz.")
+                if (!temp.renameTo(apk)) error("İndirilen APK dosyası kaydedilemedi.")
+                verifyUpdateApk(apk)
                 runOnUiThread {
                     if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
                         AlertDialog.Builder(this).setTitle("Yükleme izni gerekli")
@@ -344,6 +405,43 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     }
                 }
             } catch (e: Exception) { runOnUiThread { info("Güncelleme hatası", e.message ?: "İndirme başarısız") } }
+        }
+    }
+
+    /**
+     * Check the downloaded APK before opening Android's installer.
+     * A same-package APK signed with a different certificate cannot update the installed app.
+     */
+    @Suppress("DEPRECATION")
+    private fun verifyUpdateApk(apk: File) {
+        val flags = if (Build.VERSION.SDK_INT >= 28) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        val candidate = packageManager.getPackageArchiveInfo(apk.absolutePath, flags)
+            ?: error("İndirilen dosya geçerli bir Android APK'sı değil.")
+        if (candidate.packageName != packageName) {
+            error("Güvenlik kontrolü: APK paket kimliği mevcut Aura AI uygulamasıyla eşleşmiyor.")
+        }
+        val installed = packageManager.getPackageInfo(packageName, flags)
+        val sameSigner = if (Build.VERSION.SDK_INT >= 28) {
+            val installedSigners = installed.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            val candidateSigners = candidate.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            installedSigners.isNotEmpty() && installedSigners == candidateSigners
+        } else {
+            val installedSigners = installed.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+            val candidateSigners = candidate.signatures?.map { it.toCharsString() }?.toSet().orEmpty()
+            installedSigners.isNotEmpty() && installedSigners == candidateSigners
+        }
+        if (!sameSigner) {
+            error("Güvenlik kontrolü: APK imzası kurulu Aura AI ile eşleşmiyor. Uygulamayı kaldırma; doğru imzalı sürüm gerekli.")
+        }
+        val installedInfo = packageManager.getPackageInfo(packageName, 0)
+        val installedVersion = if (Build.VERSION.SDK_INT >= 28) installedInfo.longVersionCode else installedInfo.versionCode.toLong()
+        val candidateVersion = if (Build.VERSION.SDK_INT >= 28) candidate.longVersionCode else candidate.versionCode.toLong()
+        if (candidateVersion <= installedVersion) {
+            error("İndirilen APK sürüm kodu kurulu sürümden yeni değil.")
         }
     }
 
