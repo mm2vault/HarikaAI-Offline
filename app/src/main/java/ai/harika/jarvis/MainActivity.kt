@@ -380,7 +380,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             try {
                 val c = URL(url).openConnection() as HttpURLConnection
                 c.connectTimeout = 15000; c.readTimeout = 90000; c.instanceFollowRedirects = true
-                if (c.responseCode !in 200..299) error("HTTP " + c.responseCode)
+                if (c.responseCode !in 200..299) error("APK indirme hatası (HTTP ${c.responseCode}). Bu Release içinde APK dosyası olmayabilir veya bağlantı yanlış: $url")
                 val dir = getExternalFilesDir(null) ?: filesDir
                 val apk = File(dir, "aura-ai-update.apk")
                 val temp = File(dir, "aura-ai-update.apk.part")
