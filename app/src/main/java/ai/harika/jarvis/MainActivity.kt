@@ -437,8 +437,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (!sameSigner) {
             error("Güvenlik kontrolü: APK imzası kurulu Aura AI ile eşleşmiyor. Uygulamayı kaldırma; doğru imzalı sürüm gerekli.")
         }
-        val installedVersion = packageManager.getPackageInfo(packageName, 0).longVersionCode
-        if (candidate.longVersionCode <= installedVersion) {
+        val installedInfo = packageManager.getPackageInfo(packageName, 0)
+        val installedVersion = if (Build.VERSION.SDK_INT >= 28) installedInfo.longVersionCode else installedInfo.versionCode.toLong()
+        val candidateVersion = if (Build.VERSION.SDK_INT >= 28) candidate.longVersionCode else candidate.versionCode.toLong()
+        if (candidateVersion <= installedVersion) {
             error("İndirilen APK sürüm kodu kurulu sürümden yeni değil.")
         }
     }
