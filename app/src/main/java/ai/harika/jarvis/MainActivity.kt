@@ -305,7 +305,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 }
                 val current = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.1.0"
                 runOnUiThread {
-                    if (tag.isNotBlank() && tag.removePrefix("v") != current && apk.isNotBlank()) updateDialog(tag, json.optString("body", "Yeni sürüm hazır."), apk)
+                    val publishedVersion = tag.removePrefix("aura-").removePrefix("v").trim()
+                    if (publishedVersion.isNotBlank() && publishedVersion != current && apk.isNotBlank()) {
+                        updateDialog(publishedVersion, json.optString("body", "Yeni sürüm hazır."), apk)
+                    }
                     else if (!silent) info("Güncelleme kontrolü", "Yeni sürüm bulunamadı. Mevcut sürüm: $current")
                 }
             } catch (e: Exception) {
