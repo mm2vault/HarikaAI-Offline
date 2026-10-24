@@ -78,10 +78,40 @@ jobs:
           grep -Fx "AURA_VERSION_NAME=$VERSION_NAME" gradle.properties
           grep -Fx "AURA_VERSION_CODE=$VERSION_CODE" gradle.properties
 
+      - name: Require persistent release signing key
+        shell: bash
+        env:
+          AURA_KEYSTORE_BASE64: ${{ secrets.AURA_KEYSTORE_BASE64 }}
+          AURA_STORE_PASSWORD: ${{ secrets.AURA_STORE_PASSWORD }}
+          AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
+          AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$AURA_KEYSTORE_BASE64" || -z "$AURA_STORE_PASSWORD" || -z "$AURA_KEY_ALIAS" || -z "$AURA_KEY_PASSWORD" ]]; then
+            echo "Release blocked: configure AURA_KEYSTORE_BASE64, AURA_STORE_PASSWORD, AURA_KEY_ALIAS, and AURA_KEY_PASSWORD. Debug APKs must never be published as updates." >&2
+            exit 1
+          fi
+          printf '%s' "$AURA_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aura-release.keystore"
+          test -s "$RUNNER_TEMP/aura-release.keystore"
+
       - name: Build APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Verify APK identity, branding, and version metadata
+      - name: Sign APK with persistent release key
+        shell: bash
+        env:
+          AURA_STORE_PASSWORD: ${{ secrets.AURA_STORE_PASSWORD }}
+          AURA_KEY_ALIAS: ${{ secrets.AURA_KEY_ALIAS }}
+          AURA_KEY_PASSWORD: ${{ secrets.AURA_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" sign --ks "$RUNNER_TEMP/aura-release.keystore" --ks-key-alias "$AURA_KEY_ALIAS" --ks-pass env:AURA_STORE_PASSWORD --key-pass env:AURA_KEY_PASSWORD "$APK"
+          "$APKSIGNER" verify --verbose "$APK"
+
+      - name: Verify APK identity, branding, version metadata, and signing
         shell: bash
         env:
           EXPECTED_VERSION_NAME: ${{ steps.version.outputs.name }}
@@ -91,15 +121,17 @@ jobs:
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
-          test -n "$AAPT"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$AAPT" && test -n "$APKSIGNER"
           BADGING="$("$AAPT" dump badging "$APK")"
           echo "$BADGING" | grep -F "package: name='ai.harika.jarvis'"
           echo "$BADGING" | grep -F "application-label:'Aura AI'"
           echo "$BADGING" | grep -F "versionName='$EXPECTED_VERSION_NAME'"
           echo "$BADGING" | grep -F "versionCode='$EXPECTED_VERSION_CODE'"
-          echo "APK identity, branding, versionName and versionCode checks passed."
+          "$APKSIGNER" verify --verbose "$APK"
+          echo "APK metadata and release signature checks passed."
 
-      - name: Publish APK as a clearly marked prerelease
+      - name: Publish signed APK as prerelease
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -107,10 +139,9 @@ jobs:
           body: |
             ${{ inputs.release_notes }}
 
-            **This is a test/prerelease APK, not a stable production release.**
-            Package ID: `ai.harika.jarvis`
-            APK versionName and versionCode were verified during the build.
-            The APK uses debug signing. Android may reject installation over an existing copy if its signing certificate differs. Do not uninstall an existing app to work around this; verify signing compatibility first.
+            **Test prerelease.** Package ID: `ai.harika.jarvis`.
+            APK metadata and persistent release-key signature were verified during the build.
+            This key must match the certificate of the app already installed on the user's device for in-place updates to work.
           prerelease: true
           make_latest: false
           files: app/build/outputs/apk/debug/app-debug.apk
