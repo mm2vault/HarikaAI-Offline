@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - brain/aura-rebuild-clean
+      - brain/aura-from-main-rebuild
 
 permissions:
   contents: read
